@@ -16,21 +16,21 @@
   (metric-type [this])
   (samples [this]))
 
-(deftype CollectorRegistry [^ConcurrentHashMap names->collectors]
+(extend-type ConcurrentHashMap
   ICollectorRegistry
-  (fetch [_this name]
-    (.get names->collectors name))                          ; type needs to be checked
-  (register-or-return! [_this collector]
+  (fetch [this name]
+    (.get this name))                        ; type needs to be checked
+  (register-or-return! [this collector]
     (let [name (.name collector)]
-      (if-let [found-collector (.get names->collectors name)]
+      (if-let [found-collector (.get this name)]
         found-collector
-        (or (.putIfAbsent names->collectors (.name collector) collector) collector))))
-  (clear! [_this] (.clear names->collectors))
-  (collect [_this]
-    (flatten (map samples (.values names->collectors)))))
+        (or (.putIfAbsent this (.name collector) collector) collector))))
+  (clear! [this] (.clear this))
+  (collect [this]
+    (flatten (map samples (.values this)))))
 
 
-(def default-registry (->CollectorRegistry (ConcurrentHashMap.)))
+(def default-registry (ConcurrentHashMap.))
 
 (defrecord Sample [^String name ^String description ^Keyword type label->values ^Double value])
 
