@@ -50,8 +50,21 @@
                 #clometheus.core.Sample{:description   "Gauge without labels"
                                         :label->values {}
                                         :name          "labelless-gauge"
-                                        :type          :counter
+                                        :type          :gauge
                                         :value         3.0}) (collect default-registry))))))
+
+(deftest histogram-test
+  (clear! default-registry)
+  (let [my-histogram (histogram "my-histogram" :description "labeless histogram" :buckets [0.1 1 10] )]
+    (testing "histogram exists"
+      (is (not= nil my-histogram)))
+    (testing "histograms start with all buckets set to zero"
+      (is (= [0.0 0.0 0.0] @my-histogram)))
+    (testing "histograms can observe values"
+      (observe! my-histogram 2)
+      (is (= [0.0 0.0 1.0] @my-histogram)))
+    (testing "already registered histograms are returned and not new created"
+      (is (= my-histogram (histogram "my-histogram" "labeless histogram" [0.1 1 10]))))))
 
 
 

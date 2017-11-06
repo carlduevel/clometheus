@@ -1,7 +1,8 @@
 (ns clometheus.core
   (:import (java.util.concurrent ConcurrentHashMap)
            (java.util.concurrent.atomic DoubleAdder)
-           (clojure.lang ILookup Keyword IDeref)))
+           (clojure.lang ILookup Keyword IDeref)
+           (java.io Writer)))
 
 (defprotocol ICollectorRegistry
   (fetch [this name])
@@ -19,7 +20,7 @@
 (extend-type ConcurrentHashMap
   ICollectorRegistry
   (fetch [this name]
-    (.get this name))                        ; type needs to be checked
+    (.get this name))                                       ; type needs to be checked
   (register-or-return! [this collector]
     (let [name (.name collector)]
       (if-let [found-collector (.get this name)]
@@ -34,12 +35,7 @@
 
 (defrecord Sample [^String name ^String description ^Keyword type label->values ^Double value])
 
-(defmulti new-metric
-          (fn [type] type))
-
-
-
-(deftype Collector [^String name ^String description ^Keyword type ^ConcurrentHashMap label-values->collectors labels]
+(deftype Collector [^String name ^String description ^Keyword type ^ConcurrentHashMap label-values->collectors labels metric-fn]
   ICollector
   (name [_this] name)
   (description [_this] description)
@@ -51,7 +47,7 @@
   (valAt [this key]
     (if-let [found-metric (.get label-values->collectors key)]
       found-metric
-      (let [new-metric         (new-metric type)
+      (let [new-metric         (metric-fn)
             current-val-or-nil (.putIfAbsent label-values->collectors key new-metric)]
         (or current-val-or-nil new-metric))))
   (valAt [this key notfound]
@@ -61,10 +57,10 @@
 ; must always be the same set of metrics - exception when one is not set?
 
 
-(defn register-collector [name description labels type]
+(defn fetch-or-create-collector! [name description labels type metric-fn]
   (if-let [collector (fetch default-registry name)]
     collector
-    (register-or-return! default-registry (->Collector name description type (ConcurrentHashMap.) labels))))
+    (register-or-return! default-registry (->Collector name description type (ConcurrentHashMap.) labels metric-fn))))
 
 (defprotocol Incrementable
   (inc! [this] [this ^Double value]))
@@ -85,14 +81,7 @@
    (let [collector (counter name description [])]
      (get collector {})))
   ([name description labels]
-   (register-collector name description labels :counter)))
-
-
-
-(defmethod new-metric :counter
-  [_type]
-  (Counter. (DoubleAdder.)))
-
+   (fetch-or-create-collector! name description labels :counter #(Counter. (DoubleAdder.)))))
 
 (defprotocol Decrementable
   (dec! [this] [this value]))
@@ -112,15 +101,40 @@
   Resettable
   (set! [_this current-val] (locking current-val (.reset current-val) (.add current-val current-val))))
 
-(defmethod new-metric :gauge [_type]
-  (Gauge. (DoubleAdder.)))
-
 (defn gauge
   ([name description]
-   (let [collector (counter name description [])]
+   (let [collector (gauge name description [])]
      (get collector {})))
   ([name description labels]
-   (register-collector name description labels :gauge)))
+   (fetch-or-create-collector! name description labels :gauge #(Gauge. (DoubleAdder.)))))
+
+(defprotocol Observable
+  (observe! [this value]))
+
+(defrecord Histogram [bucket-sizes bucket-adders cumulative-counts]
+  IDeref
+  (deref [_this] (map #(.sum %) bucket-adders))
+  Observable
+  (observe! [this value]
+    (doseq [[size bucket] (map list bucket-sizes bucket-adders)] (when (<= value size) (.add bucket 1)))
+    (.add cumulative-counts 1)))
+
+;TODO: Default for description
+
+
+(defn- create-histogram! [buckets]
+  (->Histogram buckets (for [i (range (count buckets))] (DoubleAdder.)) (DoubleAdder.)))
+
+(defn histogram [name & {description :descrition buckets :buckets labels :labels :or {:buckets [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10] :labels [] :description ""}}]
+  (let [collector (fetch-or-create-collector! name description labels :histogram (partial create-histogram! buckets))]
+    (if (empty? labels)
+      (get collector {})
+      collector)))
+
+
+
+(defmethod print-method Histogram [h ^Writer writer]
+  (.write writer (str "Histogram named" (.-bucket_sizes h))))
 
 
 ;
