@@ -87,7 +87,7 @@
   (decrement! [this] [this value]))
 
 (defprotocol Resettable
-  (set! [this value]))
+  (reset! [this value]))
 
 (defrecord Gauge [^DoubleAdder current-val]
   IDeref
@@ -99,7 +99,7 @@
   (decrement! [this] (decrement! this 1))
   (decrement! [_this val] (.add current-val (* -1 val)))
   Resettable
-  (set! [_this current-val] (locking current-val (.reset current-val) (.add current-val current-val))))
+  (reset! [_this new-val] (locking current-val (.reset current-val) (.add current-val new-val))))
 
 (defn gauge
   ([name description]
@@ -126,6 +126,7 @@
 (defmulti inc! #'type-dispatch-one-or-more-args)
 (defmulti dec! #'type-dispatch-one-or-more-args)
 (defmulti observe! #'type-dispatch-2-or-more-args)
+(defmulti set! #'type-dispatch-2-or-more-args)
 
 (defmethod inc!
   Counter
@@ -154,6 +155,16 @@
       (decrement! this by)
       (throw (Exception. "No labels are possible for simple gauge!")))))
 
+(defmethod set!
+  Gauge
+  ([this val]
+    (reset! this val))
+  ([this val & {:keys [with-labels] :or {:with-labels {}}}]
+    (if (empty? with-labels)
+      (reset! this val)
+      (throw (Exception. "No labels are possible for simple gauge!")))))
+
+
 (defmethod inc!
   Collector
   ([this]
@@ -180,6 +191,16 @@
     (if (empty? with-labels)
       (throw (Exception. "Labels are missing!"))
       (-> (get this with-labels) (observation! val)))))
+
+(defmethod set!
+  Collector
+  ([this val]
+    (throw (Exception. "Labels are missing!")))
+  ([this val & {:keys [with-labels by] :or {:with-labels {}}}]
+    (if (empty? with-labels)
+      (throw (Exception. "Labels are missing!"))
+      (-> (get this with-labels) (reset! val)))))
+
 
 (defrecord Histogram [bucket-sizes bucket-adders cumulative-counts]
   IDeref
