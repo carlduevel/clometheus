@@ -1,7 +1,8 @@
 (ns clometheus.core-test
   (:require [clojure.test :refer :all]
             [clometheus.core :as c])
-  (:import (clometheus.core Counter Collector)))
+  (:import (clometheus.core Counter Collector)
+           (java.io StringWriter)))
 
 (defn clear-default-registry [f]
   (c/clear! c/default-registry)
@@ -92,7 +93,7 @@
       (c/observe! my-histogram 2)
       (is (= [0.0 0.0 1.0] @my-histogram)))
     (testing "already registered histograms are returned and not new created"
-      (is (= my-histogram (c/histogram "my-histogram" "labeless histogram" [0.1 1 10]))))
+      (is (= my-histogram (c/histogram "my-histogram" :description "labeless histogram" :buckets [0.1 1 10]))))
     (testing "histograms are collectable"
       (is (= [(c/map->Sample {:name          "my-histogram"
                               :description   nil
@@ -113,3 +114,13 @@
     (testing "histograms are collectable"
       (is (= [(c/->Sample "histogram-with-labels" "histogram with labels" :histogram {{:test :best} '(0.0 0.0 1.0) {:test :test} '(0.0 0.0 0.0)})]
              (c/collect c/default-registry))))))
+
+(defn str-represenation [of]
+  (let [w (StringWriter.)]
+    (print-method of w)
+    (.toString w)))
+
+(deftest all-abstractions-should-be-printable
+  (is (= "#clometheus.core.Gauge{:current-val 0.0}" (str-represenation (c/gauge "gauge" ""))))
+  (is (= "#clometheus.core.Counter{:current-val 0.0}" (str-represenation (c/counter "counter" ""))))
+  (is (= "#clometheus.core.Histogram{:bucket-sizes [0.1 1 10], :bucket-adders (0.0 0.0 0.0), :cumulative-counts 0.0}" (str-represenation (c/histogram "my-histogram" :description "labeless histogram" :buckets [0.1 1 10])))))

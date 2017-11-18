@@ -1,7 +1,7 @@
 (ns clometheus.core
   (:import (java.util.concurrent ConcurrentHashMap)
            (java.util.concurrent.atomic DoubleAdder)
-           (clojure.lang ILookup Keyword IDeref ExceptionInfo)
+           (clojure.lang ILookup Keyword IDeref ExceptionInfo IRecord)
            (java.io Writer)))
 
 (defprotocol ICollectorRegistry
@@ -58,6 +58,7 @@
 
 (defn fetch-or-create-collector! [name description labels type metric-fn]
   (if-let [collector (fetch default-registry name)]
+    ;TODO: TYPE CHECK!
     collector
     (register-or-return! default-registry (->Collector name description type (ConcurrentHashMap.) labels metric-fn))))
 
@@ -142,7 +143,7 @@
   ([this]
     (increment! this))
   ([this & {:keys [with-labels by] :or {:with-labels {} :by 1}}]
-    (if (empty? with-labels)
+     (if (empty? with-labels)
       (increment! this by)
       (throw (Exception. "No labels are possible for simple gauge!")))))
 
@@ -222,10 +223,18 @@
   (->Histogram buckets (for [i (range (count buckets))] (DoubleAdder.)) (DoubleAdder.)))
 
 (defn histogram [name & {description :description buckets :buckets labels :with-labels :or {:buckets [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10] :with-labels [] :description ""}}]
+  ;TODO: if second parameter must not be nil
   (let [collector (fetch-or-create-collector! name description labels :histogram (partial create-histogram! buckets))]
     (if (empty? labels)
       (get collector {})
       collector)))
 
+
+(defmethod print-method Gauge [h ^Writer writer]
+  ((get-method print-method IRecord) h writer))
+
+(defmethod print-method Counter [h ^Writer writer]
+  ((get-method print-method IRecord) h writer))
+
 (defmethod print-method Histogram [h ^Writer writer]
-  (.write writer (str "Histogram named" (.-bucket_sizes h))))
+  ((get-method print-method IRecord) h writer))
