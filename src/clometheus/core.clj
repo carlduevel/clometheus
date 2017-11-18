@@ -17,10 +17,12 @@
   (metric-type [this])
   (sample [this]))
 
+;TODO: Check metric names with this regex: [a-zA-Z_:][a-zA-Z0-9_:]*
+
 (extend-type ConcurrentHashMap
   ICollectorRegistry
   (fetch [this name]
-    (.get this name))                                       ; type needs to be checked
+    (.get this name))                                       ;TODO type needs to be checked
   (register-or-return! [this collector]
     (let [name (.name collector)]
       (if-let [found-collector (.get this name)]
@@ -223,7 +225,7 @@
   (->Histogram buckets (for [i (range (count buckets))] (DoubleAdder.)) (DoubleAdder.)))
 
 (defn histogram [name & {description :description buckets :buckets labels :with-labels :or {:buckets [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10] :with-labels [] :description ""}}]
-  ;TODO: if second parameter must not be nil
+  ;TODO: second parameter must not be nil
   (let [collector (fetch-or-create-collector! name description labels :histogram (partial create-histogram! buckets))]
     (if (empty? labels)
       (get collector {})
