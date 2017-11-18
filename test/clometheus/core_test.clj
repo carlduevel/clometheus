@@ -3,8 +3,13 @@
             [clometheus.core :refer :all])
   (:import (clometheus.core Counter Collector)))
 
-(deftest counters-wo-labels-test
+(defn clear-default-registry [f]
   (clear! default-registry)
+  (f))
+
+(use-fixtures :each clear-default-registry)
+
+(deftest counters-wo-labels-test
   (let [my-counter (counter "my-counter" "this is my counter")]
     (testing "counter start at zero"
       (is (= 0.0 @my-counter)))
@@ -23,7 +28,6 @@
              (collect default-registry))))))
 
 (deftest counters-with-labels-test
-  (clear! default-registry)
   (let [my-counter (counter "my-counter" "blabla" ["rc"])]
     (testing "Labels are managed by Collectors"
       (is (= Collector (type my-counter))))
@@ -45,8 +49,7 @@
 
 
 
-(deftest gauge-test
-  (clear! default-registry)
+(deftest simple-gauge-test
   (let [my-gauge (gauge "labelless-gauge" "Gauge without labels")]
     (testing "gauges start at zero"
       (is (= 0.0 @my-gauge)))
@@ -58,21 +61,24 @@
       (is (= 3.0 @my-gauge)))
     (testing "already registered gauges are returned and not new created"
       (is (= my-gauge (gauge "labelless-gauge" "hello"))))
-    (testing "labels are possible"
-      (let [my-label-gauge (gauge "with-labels" "a gauge with labels" ["my-label"])]
-        (inc! my-label-gauge :with-labels {:my-label :my-val})))
     (testing "gauges are collectable"
-      (is (= '(#clometheus.core.Sample{:description   "a gauge with labels"
-                                       :label->values {{:my-label :my-val} 1.0}
-                                       :name          "with-labels"
-                                       :type          :gauge}
-                #clometheus.core.Sample{:description   "Gauge without labels"
-                                        :label->values {{} 3.0}
-                                        :name          "labelless-gauge"
-                                        :type          :gauge}) (collect default-registry))))))
+      (is (= '(#clometheus.core.Sample{:description   "Gauge without labels"
+                                       :label->values {{} 3.0}
+                                       :name          "labelless-gauge"
+                                       :type          :gauge}) (collect default-registry))))))
+(deftest gauge-with-labels-test
+  (testing "labels are possible"
+    (let [my-label-gauge (gauge "with-labels" "a gauge with labels" ["my-label"])]
+      (inc! my-label-gauge :with-labels {:my-label :my-val}))
+    (is (= '(#clometheus.core.Sample{:description   "a gauge with labels"
+                                     :label->values {{:my-label :my-val} 1.0}
+                                     :name          "with-labels"
+                                     :type          :gauge})
+           (collect default-registry)))))
+
+
 
 (deftest labeless-histogram-test
-  (clear! default-registry)
   (let [my-histogram (histogram "my-histogram" :description "labeless histogram" :buckets [0.1 1 10])]
     (testing "histogram exists"
       (is (not= nil my-histogram)))
@@ -87,7 +93,6 @@
       (is (= '(#clometheus.core.Sample{:name "my-histogram", :description nil, :type :histogram, :label->values {{} (0.0 0.0 1.0)}})) (collect default-registry)))))
 
 (deftest histogram-with-test
-  (clear! default-registry)
   (let [my-histogram (histogram "histogram-with-labels" :description "histogram with labels" :buckets [0.1 1 10] :with-labels ["test"])]
     (testing "histogram exists"
       (is (not= nil my-histogram)))
@@ -98,6 +103,4 @@
     (testing "already registered histograms are returned and not new created"
       (is (= my-histogram (histogram "histogram-with-labels" :description "histogram with labels" :buckets [0.1 1 10] :with-labels ["test"]))))
     (testing "histograms are collectable"
-      (is (= (list (->Sample "histogram-with-labels" "histogram with labels" :histogram {{:test :best} '(0.0 0.0 1.0) {:test :test} '(0.0 0.0 0.0)})) (collect default-registry)))))
-
-  )
+      (is (= (list (->Sample "histogram-with-labels" "histogram with labels" :histogram {{:test :best} '(0.0 0.0 1.0) {:test :test} '(0.0 0.0 0.0)})) (collect default-registry))))))

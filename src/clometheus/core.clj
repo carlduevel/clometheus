@@ -172,8 +172,6 @@
       (throw (Exception. "Labels are missing!"))
       (-> (get this with-labels) (decrement! (or by 1))))))
 
-
-
 (defmethod observe!
   Collector
   ([this val]
@@ -199,10 +197,6 @@
       (observation! this value)
       (throw (Exception. "No labels are possible for simple histogram!")))))
 
-
-;TODO: Default for description
-
-
 (defn- create-histogram! [buckets]
   (->Histogram buckets (for [i (range (count buckets))] (DoubleAdder.)) (DoubleAdder.)))
 
@@ -212,9 +206,5 @@
       (get collector {})
       collector)))
 
-
 (defmethod print-method Histogram [h ^Writer writer]
   (.write writer (str "Histogram named" (.-bucket_sizes h))))
-
-
-
