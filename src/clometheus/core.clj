@@ -19,14 +19,14 @@
 
 (def valid-metric-name-re #"[a-zA-Z_:][a-zA-Z0-9_:]*")
 (defn validate-metric-name [name]
-  (when (not (re-matches valid-metric-name-re name))
+  (when-not (re-matches valid-metric-name-re name)
     (throw (IllegalArgumentException. (str "Invalid metric name: '" name "'. Metric name has to match this regex: [a-zA-Z_:][a-zA-Z0-9_:]*")))))
 
 
 (let [valid-label-re #"[a-zA-Z_][a-zA-Z0-9_]*"
       reserved-label-re #"__.*"]
   (defn validate-label-name [name]
-    (when (not (re-matches valid-label-re name))
+    (when-not (re-matches valid-label-re name)
       (throw (IllegalArgumentException. (str "Invalid label name: '" name "'.\n Label name has to match this regex: [a-zA-Z_][a-zA-Z0-9_]*"))))
     (when (re-matches reserved-label-re name)
       (throw (IllegalArgumentException. (str "Invalid label name: '" name "'.\n Label names beginning with two underscores are reserved for internal use."))))))
@@ -194,7 +194,7 @@
   ([this & {:keys [with-labels by] :or {:with-labels {} :by 1}}]
     (if (empty? with-labels)
       (throw (Exception. "Labels are missing!"))
-      (-> (get this with-labels) (increment! (or by 1))))))
+      (increment! (get this with-labels) (or by 1)))))
 
 (defmethod dec!
   Collector
@@ -203,7 +203,7 @@
   ([this & {:keys [with-labels by] :or {:with-labels {} :by 1}}]
     (if (empty? with-labels)
       (throw (Exception. "Labels are missing!"))
-      (-> (get this with-labels) (decrement! (or by 1))))))
+      (decrement! (get this with-labels) (or by 1)))))
 
 (defmethod observe!
   Collector
@@ -212,7 +212,7 @@
   ([this val & {:keys [with-labels by] :or {:with-labels {}}}]
     (if (empty? with-labels)
       (throw (Exception. "Labels are missing!"))
-      (-> (get this with-labels) (observation! val)))))
+      (observation! (get this with-labels) val))))
 
 (defmethod set!
   Collector
@@ -221,7 +221,7 @@
   ([this val & {:keys [with-labels by] :or {:with-labels {}}}]
     (if (empty? with-labels)
       (throw (Exception. "Labels are missing!"))
-      (-> (get this with-labels) (reset! val)))))
+      (reset! (get this with-labels) val))))
 
 
 (defrecord Histogram [bucket-sizes bucket-adders cumulative-counts]
