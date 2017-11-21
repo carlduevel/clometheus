@@ -17,7 +17,24 @@
   (metric-type [this])
   (sample [this]))
 
-;TODO: Check metric names with this regex: [a-zA-Z_:][a-zA-Z0-9_:]*
+(def valid-metric-name-re #"[a-zA-Z_:][a-zA-Z0-9_:]*")
+(defn validate-metric-name [name]
+  (when (not (re-matches valid-metric-name-re name))
+    (throw (IllegalArgumentException. (str "Invalid metric name: '" name "'. Metric name has to match this regex: [a-zA-Z_:][a-zA-Z0-9_:]*")))))
+
+
+(let [valid-label-re #"[a-zA-Z_][a-zA-Z0-9_]*"
+      reserved-label-re #"__.*"]
+  (defn validate-label-name [name]
+    (when (not (re-matches valid-label-re name))
+      (throw (IllegalArgumentException. (str "Invalid label name: '" name "'.\n Label name has to match this regex: [a-zA-Z_][a-zA-Z0-9_]*"))))
+    (when (re-matches reserved-label-re name)
+      (throw (IllegalArgumentException. (str "Invalid label name: '" name "'.\n Label names beginning with two underscores are reserved for internal use."))))))
+
+
+(defn validate-labels [label-names]
+  (doseq [label label-names]
+    (validate-label-name label)))
 
 (extend-type ConcurrentHashMap
   ICollectorRegistry
@@ -25,6 +42,8 @@
     (.get this name))                                       ;TODO type needs to be checked
   (register-or-return! [this collector]
     (let [name (.name collector)]
+      (validate-metric-name name)
+      (validate-labels (.labels collector))
       (if-let [found-collector (.get this name)]
         found-collector
         (or (.putIfAbsent this (.name collector) collector) collector))))
