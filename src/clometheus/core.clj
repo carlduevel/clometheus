@@ -23,7 +23,7 @@
     (throw (IllegalArgumentException. (str "Invalid metric name: '" name "'. Metric name has to match this regex: [a-zA-Z_:][a-zA-Z0-9_:]*")))))
 
 
-(let [valid-label-re #"[a-zA-Z_][a-zA-Z0-9_]*"
+(let [valid-label-re    #"[a-zA-Z_][a-zA-Z0-9_]*"
       reserved-label-re #"__.*"]
   (defn validate-label-name [name]
     (when-not (re-matches valid-label-re name)
@@ -164,7 +164,7 @@
   ([this]
     (increment! this))
   ([this & {:keys [with-labels by] :or {:with-labels {} :by 1}}]
-     (if (empty? with-labels)
+    (if (empty? with-labels)
       (increment! this by)
       (throw (Exception. "No labels are possible for simple gauge!")))))
 
@@ -229,7 +229,7 @@
   (deref [_this] (map #(.sum %) bucket-adders))
   Observable
   (observation! [this value]
-    (doseq [[size bucket] (map list bucket-sizes bucket-adders)] (when (<= value size) (.add bucket 1)))
+    (doseq [[size bucket] (map list bucket-sizes bucket-adders)] (when (>= value size) (.add bucket 1)))
     (.add cumulative-counts 1)))
 
 (defmethod observe!
@@ -243,12 +243,12 @@
 (defn- create-histogram! [buckets]
   (->Histogram buckets (for [i (range (count buckets))] (DoubleAdder.)) (DoubleAdder.)))
 
-(defn histogram [name & {description :description buckets :buckets labels :with-labels :or {:buckets [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10] :with-labels [] :description ""}}]
-  ;TODO: second parameter must not be nil
-  (let [collector (fetch-or-create-collector! name description labels :histogram (partial create-histogram! buckets))]
+(defn histogram [name & {description :description buckets :buckets labels :with-labels :or {buckets [0.005 0.01 0.025 0.05 0.075 0.1 0.25 0.5 0.75 1 2.5 5 7.5 10] labels [] description ""}}]
+  (let [collector (fetch-or-create-collector! name description labels :histogram (partial create-histogram! (sort buckets)))]
     (if (empty? labels)
       (get collector {})
       collector)))
+
 
 
 (defmethod print-method Gauge [h ^Writer writer]

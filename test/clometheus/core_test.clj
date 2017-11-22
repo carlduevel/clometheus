@@ -84,14 +84,14 @@
            (c/collect c/default-registry)))))
 
 (deftest labeless-histogram-test
-  (let [my-histogram (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10])]
+  (let [my-histogram (c/histogram "my_histogram")]
     (testing "histogram exists"
       (is (not= nil my-histogram)))
     (testing "histograms start with all buckets set to zero"
-      (is (= [0.0 0.0 0.0] @my-histogram)))
+      (is (= (repeat 14 0.0) @my-histogram)))
     (testing "histograms can observe values"
       (c/observe! my-histogram 2)
-      (is (= [0.0 0.0 1.0] @my-histogram)))
+      (is (= (concat (repeat 10 1.0) (repeat 4 0.0)) @my-histogram)))
     (testing "already registered histograms are returned and not new created"
       (is (= my-histogram (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10]))))
     (testing "histograms are collectable"
@@ -112,7 +112,7 @@
     (testing "already registered histograms are returned and not new created"
       (is (= my-histogram (c/histogram "histogram_with_labels" :description "histogram with labels" :buckets [0.1 1 10] :with-labels ["test"]))))
     (testing "histograms are collectable"
-      (is (= [(c/->Sample "histogram_with_labels" "histogram with labels" :histogram {{:test :best} '(0.0 0.0 1.0) {:test :test} '(0.0 0.0 0.0)})]
+      (is (= [(c/->Sample "histogram_with_labels" "histogram with labels" :histogram {{:test :best} '(1.0 1.0 0.0) {:test :test} '(0.0 0.0 0.0)})]
              (c/collect c/default-registry))))))
 
 (defn str-represenation [of]
@@ -123,7 +123,7 @@
 (deftest all-abstractions-should-be-printable
   (is (= "#clometheus.core.Gauge{:current-val 0.0}" (str-represenation (c/gauge "gauge" ""))))
   (is (= "#clometheus.core.Counter{:current-val 0.0}" (str-represenation (c/counter "counter" ""))))
-  (is (= "#clometheus.core.Histogram{:bucket-sizes [0.1 1 10], :bucket-adders (0.0 0.0 0.0), :cumulative-counts 0.0}" (str-represenation (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10])))))
+  (is (= "#clometheus.core.Histogram{:bucket-sizes (0.1 1 10), :bucket-adders (0.0 0.0 0.0), :cumulative-counts 0.0}" (str-represenation (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10])))))
 
 (deftest restriction-on-metric-names-test
   (testing "Special chars are not allowed in a metric name"
