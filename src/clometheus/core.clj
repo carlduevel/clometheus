@@ -152,36 +152,28 @@
 
 (defmethod inc!
   Counter
-  ([this]
-    (increment! this))
-  ([this & {:keys [with-labels by] :or {:with-labels {} :by 1}}]
+  ([this & {:keys [with-labels by] :or {with-labels {} by 1}}]
     (if (empty? with-labels)
       (increment! this by)
       (throw (Exception. "No labels are possible for simple counter!")))))
 
 (defmethod inc!
   Gauge
-  ([this]
-    (increment! this))
-  ([this & {:keys [with-labels by] :or {:with-labels {} :by 1}}]
+  ([this & {:keys [with-labels by] :or {with-labels {} by 1}}]
     (if (empty? with-labels)
       (increment! this by)
       (throw (Exception. "No labels are possible for simple gauge!")))))
 
 (defmethod dec!
   Gauge
-  ([this]
-    (decrement! this))
-  ([this & {:keys [with-labels by] :or {:with-labels {} :by 1}}]
+  ([this & {:keys [with-labels by] :or {with-labels {} by 1}}]
     (if (empty? with-labels)
       (decrement! this by)
       (throw (Exception. "No labels are possible for simple gauge!")))))
 
 (defmethod set!
   Gauge
-  ([this val]
-    (reset! this val))
-  ([this val & {:keys [with-labels] :or {:with-labels {}}}]
+  ([this val & {:keys [with-labels] :or {with-labels {}}}]
     (if (empty? with-labels)
       (reset! this val)
       (throw (Exception. "No labels are possible for simple gauge!")))))
@@ -189,27 +181,21 @@
 
 (defmethod inc!
   Collector
-  ([this]
-    (throw (Exception. "Labels are missing!")))
-  ([this & {:keys [with-labels by] :or {:with-labels {} :by 1}}]
+  ([this & {:keys [with-labels by] :or {with-labels {} by 1}}]
     (if (empty? with-labels)
       (throw (Exception. "Labels are missing!"))
       (increment! (get this with-labels) (or by 1)))))
 
 (defmethod dec!
   Collector
-  ([this]
-    (throw (Exception. "Labels are missing!")))
-  ([this & {:keys [with-labels by] :or {:with-labels {} :by 1}}]
+  ([this & {:keys [with-labels by] :or {with-labels {} by 1}}]
     (if (empty? with-labels)
       (throw (Exception. "Labels are missing!"))
       (decrement! (get this with-labels) (or by 1)))))
 
 (defmethod observe!
   Collector
-  ([this val]
-    (throw (Exception. "Labels are missing!")))
-  ([this val & {:keys [with-labels by] :or {:with-labels {}}}]
+  ([this val & {:keys [with-labels by] :or {with-labels {}}}]
     (if (empty? with-labels)
       (throw (Exception. "Labels are missing!"))
       (observation! (get this with-labels) val))))
@@ -218,11 +204,10 @@
   Collector
   ([this val]
     (throw (Exception. "Labels are missing!")))
-  ([this val & {:keys [with-labels by] :or {:with-labels {}}}]
+  ([this val & {:keys [with-labels] :or {:with-labels {}}}]
     (if (empty? with-labels)
       (throw (Exception. "Labels are missing!"))
       (reset! (get this with-labels) val))))
-
 
 (defrecord Histogram [bucket-sizes bucket-adders cumulative-counts]
   IDeref
@@ -234,8 +219,7 @@
 
 (defmethod observe!
   Histogram
-  ([this value] (observation! this value))
-  ([this value & {:keys [with-labels] :or {:with-labels {}}}]
+  ([this value & {:keys [with-labels] :or {with-labels {}}}]
     (if (empty? with-labels)
       (observation! this value)
       (throw (Exception. "No labels are possible for simple histogram!")))))
@@ -248,8 +232,6 @@
     (if (empty? labels)
       (get collector {})
       collector)))
-
-
 
 (defmethod print-method Gauge [h ^Writer writer]
   ((get-method print-method IRecord) h writer))
