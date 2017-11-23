@@ -54,7 +54,7 @@
 
 (defn ^ICollectorRegistry registry [] (ConcurrentHashMap.))
 
-(def default-registry (registry))
+(defonce default-registry (registry))
 
 (defrecord Sample [^String name ^String description ^Keyword type label->values])
 
