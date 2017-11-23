@@ -26,7 +26,9 @@
       (is (= my-counter (c/counter "my_counter"))))
     (testing "counters are collectable"
       (is (= [(c/map->Sample {:name "my_counter" :description "this is my counter" :type :counter :label->values {{} 3.0}})]
-             (c/collect c/default-registry))))))
+             (c/collect c/default-registry))))
+    (testing "counters can be registered to other registries than the default one"
+      (is (not= my-counter (c/counter "my_counter" :registry (c/registry)))))))
 
 (deftest counters-with-labels-test
   (let [my-counter (c/counter "my_counter" :description "blabla" :with-labels ["rc"])]
@@ -70,7 +72,9 @@
       (is (= [(c/map->Sample {:description   "Gauge without labels"
                               :label->values {{} 1.0}
                               :name          "labelless_gauge"
-                              :type          :gauge})] (c/collect c/default-registry))))))
+                              :type          :gauge})] (c/collect c/default-registry))))
+    (testing "gauges can be registered to other registries than the default one"
+      (is (not= my-gauge (c/gauge "labelless_gauge" :registry (c/registry)))))))
 
 (deftest gauge-with-labels-test
   (testing "labels are possible"
@@ -99,7 +103,9 @@
                               :description   nil
                               :type          :histogram
                               :label->values {{} [0.0 0.0 1.0]}})])
-          (c/collect c/default-registry)))))
+          (c/collect c/default-registry)))
+    (testing "histograms can be registered to other registries than the default one"
+      (is (not= my-histogram (c/histogram "my_histogram" :registry (c/registry)))))))
 
 (deftest histogram-with-test
   (let [my-histogram (c/histogram "histogram_with_labels" :description "histogram with labels" :buckets [0.1 1 10] :with-labels ["test"])]

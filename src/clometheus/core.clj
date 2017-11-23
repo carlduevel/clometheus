@@ -52,7 +52,9 @@
     (map sample (.values this))))
 
 
-(def default-registry (ConcurrentHashMap.))
+(defn ^ICollectorRegistry registry [] (ConcurrentHashMap.))
+
+(def default-registry (registry))
 
 (defrecord Sample [^String name ^String description ^Keyword type label->values])
 
@@ -77,11 +79,11 @@
 ; must always be the same set of metrics - exception when one is not set?
 
 
-(defn fetch-or-create-collector! [name description labels type metric-fn]
-  (if-let [collector (fetch default-registry name)]
+(defn fetch-or-create-collector! [name description labels type metric-fn registry]
+  (if-let [collector (fetch registry name)]
     ;TODO: TYPE CHECK!
     collector
-    (register-or-return! default-registry (->Collector name description type (ConcurrentHashMap.) labels metric-fn))))
+    (register-or-return! registry (->Collector name description type (ConcurrentHashMap.) labels metric-fn))))
 
 (defprotocol Incrementable
   (increment! [this] [this ^Double value]))
@@ -99,8 +101,8 @@
       (throw (IllegalArgumentException. "Counters cannot be incremented with negative values")))))
 
 (defn counter
-  ([name & {description :description labels :with-labels :or {labels [] description ""}}]
-   (let [collector (fetch-or-create-collector! name description labels :counter #(Counter. (DoubleAdder.)))]
+  ([name & {description :description labels :with-labels registry :registry :or {labels [] description "" registry default-registry}}]
+   (let [collector (fetch-or-create-collector! name description labels :counter #(Counter. (DoubleAdder.)) registry)]
      (if (empty? labels)
        (get collector {})
        collector))))
@@ -124,8 +126,8 @@
   (reset! [_this new-val] (locking current-val (.reset current-val) (.add current-val new-val))))
 
 (defn gauge
-  [name & {description :description labels :with-labels :or {labels [] description ""}}]
-  (let [collector (fetch-or-create-collector! name description labels :gauge #(Gauge. (DoubleAdder.)))]
+  [name & {description :description labels :with-labels registry :registry :or {labels [] description "" registry default-registry}}]
+  (let [collector (fetch-or-create-collector! name description labels :gauge #(Gauge. (DoubleAdder.)) registry)]
     (if (empty? labels)
       (get collector {})
       collector)))
@@ -227,8 +229,9 @@
 (defn- create-histogram! [buckets]
   (->Histogram buckets (for [i (range (count buckets))] (DoubleAdder.)) (DoubleAdder.)))
 
-(defn histogram [name & {description :description buckets :buckets labels :with-labels :or {buckets [0.005 0.01 0.025 0.05 0.075 0.1 0.25 0.5 0.75 1 2.5 5 7.5 10] labels [] description ""}}]
-  (let [collector (fetch-or-create-collector! name description labels :histogram (partial create-histogram! (sort buckets)))]
+(defn histogram [name & {description :description buckets :buckets labels :with-labels registry :registry :or
+                                     {buckets [0.005 0.01 0.025 0.05 0.075 0.1 0.25 0.5 0.75 1 2.5 5 7.5 10] labels [] description "" registry default-registry}}]
+  (let [collector (fetch-or-create-collector! name description labels :histogram (partial create-histogram! (sort buckets)) registry)]
     (if (empty? labels)
       (get collector {})
       collector)))
