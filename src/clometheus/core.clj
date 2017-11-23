@@ -99,11 +99,11 @@
       (throw (IllegalArgumentException. "Counters cannot be incremented with negative values")))))
 
 (defn counter
-  ([name description]
-   (let [collector (counter name description [])]
-     (get collector {})))
-  ([name description labels]
-   (fetch-or-create-collector! name description labels :counter #(Counter. (DoubleAdder.)))))
+  ([name & {description :description labels :with-labels :or {labels [] description ""}}]
+   (let [collector (fetch-or-create-collector! name description labels :counter #(Counter. (DoubleAdder.)))]
+     (if (empty? labels)
+       (get collector {})
+       collector))))
 
 (defprotocol Decrementable
   (decrement! [this] [this value]))
@@ -124,11 +124,11 @@
   (reset! [_this new-val] (locking current-val (.reset current-val) (.add current-val new-val))))
 
 (defn gauge
-  ([name description]
-   (let [collector (gauge name description [])]
-     (get collector {})))
-  ([name description labels]
-   (fetch-or-create-collector! name description labels :gauge #(Gauge. (DoubleAdder.)))))
+  [name & {description :description labels :with-labels :or {labels [] description ""}}]
+  (let [collector (fetch-or-create-collector! name description labels :gauge #(Gauge. (DoubleAdder.)))]
+    (if (empty? labels)
+      (get collector {})
+      collector)))
 
 (defprotocol Observable
   (observation! [this value]))

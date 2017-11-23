@@ -11,25 +11,25 @@
 (use-fixtures :each clear-default-registry)
 
 (deftest counters-wo-labels-test
-  (let [my-counter (c/counter "my_counter" "this is my counter")]
+  (let [my-counter (c/counter "my_counter" :description "this is my counter")]
     (testing "counter start at zero"
       (is (= 0.0 @my-counter)))
     (testing "incrementing by one works"
       (c/inc! my-counter)
       (is (= 1.0 @my-counter)))
     (testing "incrementing by more than one works"
-      (c/inc! (c/counter "my_counter" "hello") :by 2)
+      (c/inc! (c/counter "my_counter" :description "hello") :by 2)
       (is (= 3.0 @my-counter)))
     (testing "counters may only go up"
       (is (thrown? IllegalArgumentException (c/inc! my-counter :by -1))))
     (testing "already registered counters are returned and not new created"
-      (is (= my-counter (c/counter "my_counter" "hello"))))
+      (is (= my-counter (c/counter "my_counter"))))
     (testing "counters are collectable"
       (is (= [(c/map->Sample {:name "my_counter" :description "this is my counter" :type :counter :label->values {{} 3.0}})]
              (c/collect c/default-registry))))))
 
 (deftest counters-with-labels-test
-  (let [my-counter (c/counter "my_counter" "blabla" ["rc"])]
+  (let [my-counter (c/counter "my_counter" :description "blabla" :with-labels ["rc"])]
     (testing "Labels are managed by Collectors"
       (is (= Collector (type my-counter))))
     (testing "Incrementing by more than one works"
@@ -52,7 +52,7 @@
              (c/collect c/default-registry))))))
 
 (deftest simple-gauge-test
-  (let [my-gauge (c/gauge "labelless_gauge" "Gauge without labels")]
+  (let [my-gauge (c/gauge "labelless_gauge" :description "Gauge without labels")]
     (testing "gauges start at zero"
       (is (= 0.0 @my-gauge)))
     (testing "incrementing by one works"
@@ -62,7 +62,7 @@
       (c/inc! my-gauge :by 2)
       (is (= 3.0 @my-gauge)))
     (testing "already registered gauges are returned and not new created"
-      (is (= my-gauge (c/gauge "labelless_gauge" "hello"))))
+      (is (= my-gauge (c/gauge "labelless_gauge" :description "hello"))))
     (testing "Setting gauges to a specific value is possible"
       (c/set! my-gauge 1.0)
       (is (= 1.0 @my-gauge)))
@@ -74,7 +74,7 @@
 
 (deftest gauge-with-labels-test
   (testing "labels are possible"
-    (let [my-label-gauge (c/gauge "with_labels" "a gauge with labels" ["my_label"])]
+    (let [my-label-gauge (c/gauge "with_labels" :description "a gauge with labels" :with-labels ["my_label"])]
       (c/inc! my-label-gauge :with-labels {:my_label :my-val})
       (c/set! my-label-gauge 2.0 :with-labels {:my_label :my-val}))
     (is (= [(c/map->Sample {:description   "a gauge with labels"
@@ -121,17 +121,17 @@
     (.toString w)))
 
 (deftest all-abstractions-should-be-printable
-  (is (= "#clometheus.core.Gauge{:current-val 0.0}" (str-represenation (c/gauge "gauge" ""))))
-  (is (= "#clometheus.core.Counter{:current-val 0.0}" (str-represenation (c/counter "counter" ""))))
+  (is (= "#clometheus.core.Gauge{:current-val 0.0}" (str-represenation (c/gauge "gauge"))))
+  (is (= "#clometheus.core.Counter{:current-val 0.0}" (str-represenation (c/counter "counter"))))
   (is (= "#clometheus.core.Histogram{:bucket-sizes (0.1 1 10), :bucket-adders (0.0 0.0 0.0), :cumulative-counts 0.0}" (str-represenation (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10])))))
 
 (deftest restriction-on-metric-names-test
   (testing "Special chars are not allowed in a metric name"
-    (is (thrown-with-msg? IllegalArgumentException #"Invalid metric name:" (c/gauge "%!=!" ""))))
+    (is (thrown-with-msg? IllegalArgumentException #"Invalid metric name:" (c/gauge "%!=!"))))
   (testing "Label names must not contain dashes."
-    (is (thrown-with-msg? IllegalArgumentException #"Invalid label name:" (c/gauge "legal_name" "" ["illlegal-label"]))))
+    (is (thrown-with-msg? IllegalArgumentException #"Invalid label name:" (c/gauge "legal_name" :with-labels ["illlegal-label"]))))
   (testing "Label names starting with two dashes are reserved for internal use"
     (is (thrown-with-msg?
           IllegalArgumentException
           #"Invalid label name: '__internal_label'.\n Label names beginning with two underscores are reserved for internal use."
-          (c/gauge "legal_name" "" ["__internal_label"])))))
+          (c/gauge "legal_name" :with-labels ["__internal_label"])))))
