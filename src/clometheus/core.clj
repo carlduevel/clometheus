@@ -5,14 +5,14 @@
            (java.io Writer)))
 
 (defprotocol ICollectorRegistry
-  (fetch [this name])
+  (fetch [this name type])
   (register-or-return! [this collector])
   (clear! [this])
   (collect [this]))
 
 
 (defprotocol ICollector
-  (name [this])
+  (metric-name [this])
   (description [this])
   (metric-type [this])
   (sample [this]))
@@ -38,15 +38,22 @@
 
 (extend-type ConcurrentHashMap
   ICollectorRegistry
-  (fetch [this name]
-    (.get this name))                                       ;TODO type needs to be checked
-  (register-or-return! [this collector]
-    (let [name (.name collector)]
-      (validate-metric-name name)
-      (validate-labels (.labels collector))
-      (if-let [found-collector (.get this name)]
+  (fetch [this metric-name metric-type]
+    (when-let [found-collector (.get this metric-name)]
+      (if (= (.type found-collector) metric-type)
         found-collector
-        (or (.putIfAbsent this (.name collector) collector) collector))))
+        (throw (IllegalArgumentException.
+                 (format "Metric %s is a %s and not a %s"
+                         metric-name (name (.type found-collector)) (name metric-type)))))))
+  (register-or-return! [this collector]
+    (let [name (.metric_name collector)
+          type (.type collector)]
+      (if-let [found-collector (fetch this name type)]
+        found-collector
+        (do
+          (validate-metric-name name)
+          (validate-labels (.labels collector))
+          (or (.putIfAbsent this (.metric_name collector) collector) collector)))))
   (clear! [this] (.clear this))
   (collect [this]
     (map sample (.values this))))
@@ -58,13 +65,13 @@
 
 (defrecord Sample [^String name ^String description ^Keyword type label->values])
 
-(deftype Collector [^String name ^String description ^Keyword type ^ConcurrentHashMap label-values->collectors labels metric-fn]
+(deftype Collector [^String metric-name ^String description ^Keyword type ^ConcurrentHashMap label-values->collectors labels metric-fn]
   ICollector
-  (name [_this] name)
+  (metric-name [_this] metric-name)
   (description [_this] description)
   (metric-type [this] type)
   (sample [_this]
-    (->Sample name description type (reduce-kv (fn [m k collector] (assoc m k @collector)) {} (into {} label-values->collectors))))
+    (->Sample metric-name description type (reduce-kv (fn [m k collector] (assoc m k @collector)) {} (into {} label-values->collectors))))
   ILookup
   (valAt [this key]
     (if-let [found-metric (.get label-values->collectors key)]
@@ -80,10 +87,7 @@
 
 
 (defn fetch-or-create-collector! [name description labels type metric-fn registry]
-  (if-let [collector (fetch registry name)]
-    ;TODO: TYPE CHECK!
-    collector
-    (register-or-return! registry (->Collector name description type (ConcurrentHashMap.) labels metric-fn))))
+  (register-or-return! registry (->Collector name description type (ConcurrentHashMap.) labels metric-fn)))
 
 (defprotocol Incrementable
   (increment! [this] [this ^Double value]))

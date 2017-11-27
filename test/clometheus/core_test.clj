@@ -132,12 +132,18 @@
   (is (= "#clometheus.core.Histogram{:bucket-sizes (0.1 1 10), :bucket-adders (0.0 0.0 0.0), :cumulative-counts 0.0}" (str-represenation (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10])))))
 
 (deftest restriction-on-metric-names-test
-  (testing "Special chars are not allowed in a metric name"
+  (testing "Special chars are not allowed in a metric name."
     (is (thrown-with-msg? IllegalArgumentException #"Invalid metric name:" (c/gauge "%!=!"))))
   (testing "Label names must not contain dashes."
     (is (thrown-with-msg? IllegalArgumentException #"Invalid label name:" (c/gauge "legal_name" :with-labels ["illlegal-label"]))))
-  (testing "Label names starting with two dashes are reserved for internal use"
+  (testing "Label names starting with two dashes are reserved for internal use."
     (is (thrown-with-msg?
           IllegalArgumentException
           #"Invalid label name: '__internal_label'.\n Label names beginning with two underscores are reserved for internal use."
-          (c/gauge "legal_name" :with-labels ["__internal_label"])))))
+          (c/gauge "legal_name" :with-labels ["__internal_label"]))))
+  (testing "Two different metrics cannot be registered under the same name."
+    (is (thrown-with-msg? IllegalArgumentException
+                          #"Metric my_metric is a counter and not a gauge"
+                          (c/counter "my_metric")
+                          (c/gauge "my_metric")))))
+
