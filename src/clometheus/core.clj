@@ -215,13 +215,14 @@
       (throw (Exception. "Labels are missing!"))
       (reset! (get this with-labels) val))))
 
-(defrecord Histogram [bucket-sizes bucket-adders cumulative-counts]
+(defrecord Histogram [bucket-sizes bucket-adders count sum]
   IDeref
   (deref [_this] (map #(.sum %) bucket-adders))
   Observable
   (observation! [this value]
     (doseq [[size bucket] (map list bucket-sizes bucket-adders)] (when (>= value size) (.add bucket 1)))
-    (.add cumulative-counts 1)))
+    (.add count 1)
+    (.add sum value)))
 
 (defmethod observe!
   Histogram
@@ -231,7 +232,7 @@
       (throw (Exception. "No labels are possible for simple histogram!")))))
 
 (defn- create-histogram! [buckets]
-  (->Histogram buckets (for [i (range (count buckets))] (DoubleAdder.)) (DoubleAdder.)))
+  (->Histogram buckets (for [i (range (count buckets))] (DoubleAdder.)) (DoubleAdder.) (DoubleAdder.)))
 
 (defn histogram [name & {description :description buckets :buckets labels :with-labels registry :registry :or
                                      {buckets [0.005 0.01 0.025 0.05 0.075 0.1 0.25 0.5 0.75 1 2.5 5 7.5 10] labels [] description "" registry default-registry}}]

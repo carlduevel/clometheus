@@ -96,6 +96,10 @@
     (testing "histograms can observe values"
       (c/observe! my-histogram 2)
       (is (= (concat (repeat 10 1.0) (repeat 4 0.0)) @my-histogram)))
+    (testing "histograms have a total count"
+      (is (= 1 (:count my-histogram))))
+    (testing "histograms have a total sum"
+      (is (= 2(:sum my-histogram))))
     (testing "already registered histograms are returned and not new created"
       (is (= my-histogram (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10]))))
     (testing "histograms are collectable"
@@ -131,7 +135,7 @@
 (deftest all-abstractions-should-be-printable
   (is (= "#clometheus.core.Gauge{:current-val 0.0}" (str-represenation (c/gauge "gauge"))))
   (is (= "#clometheus.core.Counter{:current-val 0.0}" (str-represenation (c/counter "counter"))))
-  (is (= "#clometheus.core.Histogram{:bucket-sizes (0.1 1 10), :bucket-adders (0.0 0.0 0.0), :cumulative-counts 0.0}" (str-represenation (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10])))))
+  (is (= "#clometheus.core.Histogram{:bucket-sizes (0.1 1 10), :bucket-adders (0.0 0.0 0.0), :count 0.0, :sum 0.0}" (str-represenation (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10])))))
 
 (deftest restriction-on-metric-names-test
   (testing "Special chars are not allowed in a metric name."
