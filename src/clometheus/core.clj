@@ -1,7 +1,7 @@
 (ns clometheus.core
   (:import (java.util.concurrent ConcurrentHashMap)
            (java.util.concurrent.atomic DoubleAdder)
-           (clojure.lang ILookup Keyword IDeref ExceptionInfo IRecord)
+           (clojure.lang ILookup Keyword IDeref ExceptionInfo IRecord PersistentHashSet)
            (java.io Writer)))
 
 (defprotocol ICollectorRegistry
@@ -65,7 +65,7 @@
 
 (defrecord Sample [^String name ^String description ^Keyword type label->values])
 
-(deftype Collector [^String metric-name ^String description ^Keyword type ^ConcurrentHashMap label-values->collectors labels metric-fn]
+(deftype Collector [^String metric-name ^String description ^Keyword type ^ConcurrentHashMap label-values->collectors ^PersistentHashSet labels metric-fn]
   ICollector
   (metric-name [_this] metric-name)
   (description [_this] description)
@@ -87,7 +87,7 @@
 
 
 (defn fetch-or-create-collector! [name description labels type metric-fn registry]
-  (register-or-return! registry (->Collector name description type (ConcurrentHashMap.) labels metric-fn)))
+  (register-or-return! registry (->Collector name description type (ConcurrentHashMap.) (set labels) metric-fn)))
 
 (defprotocol Incrementable
   (increment! [this] [this ^Double value]))
@@ -235,6 +235,8 @@
 
 (defn histogram [name & {description :description buckets :buckets labels :with-labels registry :registry :or
                                      {buckets [0.005 0.01 0.025 0.05 0.075 0.1 0.25 0.5 0.75 1 2.5 5 7.5 10] labels [] description "" registry default-registry}}]
+  (when (contains? (set labels) "le")
+    (throw (IllegalArgumentException. "'le' is a reserved label name for buckets.")))
   (let [collector (fetch-or-create-collector! name description labels :histogram (partial create-histogram! (sort buckets)) registry)]
     (if (empty? labels)
       (get collector {})

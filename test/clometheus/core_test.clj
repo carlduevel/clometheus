@@ -107,7 +107,7 @@
     (testing "histograms can be registered to other registries than the default one"
       (is (not= my-histogram (c/histogram "my_histogram" :registry (c/registry)))))))
 
-(deftest histogram-with-test
+(deftest histogram-with-labels-test
   (let [my-histogram (c/histogram "histogram_with_labels" :description "histogram with labels" :buckets [0.1 1 10] :with-labels ["test"])]
     (testing "histogram exists"
       (is (not= nil my-histogram)))
@@ -119,7 +119,9 @@
       (is (= my-histogram (c/histogram "histogram_with_labels" :description "histogram with labels" :buckets [0.1 1 10] :with-labels ["test"]))))
     (testing "histograms are collectable"
       (is (= [(c/->Sample "histogram_with_labels" "histogram with labels" :histogram {{:test :best} '(1.0 1.0 0.0) {:test :test} '(0.0 0.0 0.0)})]
-             (c/collect c/default-registry))))))
+             (c/collect c/default-registry))))
+    (testing "histograms cannot have 'le' as a label name"
+      (is (thrown-with-msg? IllegalArgumentException #"'le' is a reserved label name for buckets." (c/histogram "le_as_label_name_is_reserved" :with-labels ["le"]))))))
 
 (defn str-represenation [of]
   (let [w (StringWriter.)]
