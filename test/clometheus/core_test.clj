@@ -13,13 +13,13 @@
 (deftest labelless-counter-test
   (let [my-counter (c/counter "my_counter" :description "this is my counter")]
     (testing "counter start at zero"
-      (is (= 0.0 @my-counter)))
+      (is (== 0 @my-counter)))
     (testing "incrementing by one works"
       (c/inc! my-counter)
-      (is (= 1.0 @my-counter)))
+      (is (== 1 @my-counter)))
     (testing "incrementing by more than one works"
       (c/inc! (c/counter "my_counter" :description "hello") :by 2)
-      (is (= 3.0 @my-counter)))
+      (is (== 3 @my-counter)))
     (testing "counters may only go up"
       (is (thrown? IllegalArgumentException (c/inc! my-counter :by -1))))
     (testing "already registered counters are returned and not new created"
@@ -59,18 +59,18 @@
 (deftest labelless-gauge-test
   (let [my-gauge (c/gauge "labelless_gauge" :description "Gauge without labels")]
     (testing "gauges start at zero"
-      (is (= 0.0 @my-gauge)))
+      (is (== 0 @my-gauge)))
     (testing "incrementing by one works"
       (c/inc! my-gauge)
-      (is (= 1.0 @my-gauge)))
+      (is (== 1 @my-gauge)))
     (testing "incrementing by more than one works"
       (c/inc! my-gauge :by 2)
-      (is (= 3.0 @my-gauge)))
+      (is (== 3 @my-gauge)))
     (testing "already registered gauges are returned and not new created"
       (is (= my-gauge (c/gauge "labelless_gauge" :description "hello"))))
     (testing "Setting gauges to a specific value is possible"
       (c/set! my-gauge 1.0)
-      (is (= 1.0 @my-gauge)))
+      (is (== 1 @my-gauge)))
     (testing "gauges are collectable"
       (is (= [(c/map->Sample {:description   "Gauge without labels"
                               :label->values {{} 1.0}

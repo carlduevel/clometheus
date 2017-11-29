@@ -151,10 +151,10 @@
   ([this val & opts]
    (type this)))
 
-(defmulti inc! #'type-dispatch-one-or-more-args)
-(defmulti dec! #'type-dispatch-one-or-more-args)
-(defmulti observe! #'type-dispatch-2-or-more-args)
-(defmulti set! #'type-dispatch-2-or-more-args)
+(defmulti inc! type-dispatch-one-or-more-args)
+(defmulti dec! type-dispatch-one-or-more-args)
+(defmulti observe! type-dispatch-2-or-more-args)
+(defmulti set! type-dispatch-2-or-more-args)
 
 (defmethod inc!
   Counter
