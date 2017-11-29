@@ -25,14 +25,14 @@
 
 (let [valid-label-re    #"[a-zA-Z_][a-zA-Z0-9_]*"
       reserved-label-re #"__.*"]
-  (defn validate-label-name [name]
-    (when-not (re-matches valid-label-re name)
-      (throw (IllegalArgumentException. (str "Invalid label name: '" name "'.\n Label name has to match this regex: [a-zA-Z_][a-zA-Z0-9_]*"))))
-    (when (re-matches reserved-label-re name)
-      (throw (IllegalArgumentException. (str "Invalid label name: '" name "'.\n Label names beginning with two underscores are reserved for internal use."))))))
+  (defn validate-label-name [label-name]
+    (when-not (re-matches valid-label-re label-name)
+      (throw (IllegalArgumentException. (str "Invalid label name: '" label-name "'.\n Label name has to match this regex: [a-zA-Z_][a-zA-Z0-9_]*"))))
+    (when (re-matches reserved-label-re label-name)
+      (throw (IllegalArgumentException. (str "Invalid label name: '" label-name "'.\n Label names beginning with two underscores are reserved for internal use."))))))
 
 
-(defn validate-labels [label-names]
+(defn validate-label-names [label-names]
   (doseq [label label-names]
     (validate-label-name label)))
 
@@ -52,7 +52,7 @@
         found-collector
         (do
           (validate-metric-name name)
-          (validate-labels (.labels collector))
+          (validate-label-names (.labels collector))
           (or (.putIfAbsent this (.metric_name collector) collector) collector)))))
   (clear! [this] (.clear this))
   (collect [this]
@@ -184,36 +184,35 @@
       (reset! this val)
       (throw (Exception. "No labels are possible for simple gauge!")))))
 
+(defn validate-labels [^Collector collector labels->values]
+  (when-not (= (.labels collector) (set (keys labels->values)))
+    (throw (IllegalArgumentException.
+             (str "Wrong or insufficient labels provided. All and only these must be set: " (.labels collector))))))
+
 
 (defmethod inc!
   Collector
   ([this & {:keys [with-labels by] :or {with-labels {} by 1}}]
-    (if (empty? with-labels)
-      (throw (Exception. "Labels are missing!"))
-      (increment! (get this with-labels) (or by 1)))))
+    (validate-labels this with-labels)
+    (increment! (get this with-labels) (or by 1))))
 
 (defmethod dec!
   Collector
   ([this & {:keys [with-labels by] :or {with-labels {} by 1}}]
-    (if (empty? with-labels)
-      (throw (Exception. "Labels are missing!"))
-      (decrement! (get this with-labels) (or by 1)))))
+    (validate-labels this with-labels)
+    (decrement! (get this with-labels) (or by 1))))
 
 (defmethod observe!
   Collector
   ([this val & {:keys [with-labels by] :or {with-labels {}}}]
-    (if (empty? with-labels)
-      (throw (Exception. "Labels are missing!"))
-      (observation! (get this with-labels) val))))
+    (validate-labels this with-labels)
+    (observation! (get this with-labels) val)))
 
 (defmethod set!
   Collector
-  ([this val]
-    (throw (Exception. "Labels are missing!")))
   ([this val & {:keys [with-labels] :or {:with-labels {}}}]
-    (if (empty? with-labels)
-      (throw (Exception. "Labels are missing!"))
-      (reset! (get this with-labels) val))))
+    (validate-labels this with-labels)
+    (reset! (get this with-labels) val)))
 
 (defrecord Histogram [bucket-sizes bucket-adders count sum]
   IDeref

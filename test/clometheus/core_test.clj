@@ -10,7 +10,7 @@
 
 (use-fixtures :each clear-default-registry)
 
-(deftest counters-wo-labels-test
+(deftest labelless-counter-test
   (let [my-counter (c/counter "my_counter" :description "this is my counter")]
     (testing "counter start at zero"
       (is (= 0.0 @my-counter)))
@@ -30,30 +30,33 @@
     (testing "counters can be registered to other registries than the default one"
       (is (not= my-counter (c/counter "my_counter" :registry (c/registry)))))))
 
-(deftest counters-with-labels-test
+(deftest counter-with-labels-test
   (let [my-counter (c/counter "my_counter" :description "blabla" :with-labels ["rc"])]
     (testing "Labels are managed by Collectors"
       (is (= Collector (type my-counter))))
     (testing "Incrementing by more than one works"
-      (c/inc! my-counter :by 2 :with-labels {:rc 500})
-      (is (== 2 @(get my-counter {:rc 500}))))
+      (c/inc! my-counter :by 2 :with-labels {"rc" 500})
+      (is (== 2 @(get my-counter {"rc" 500}))))
     (testing "Incrementing by just one works"
-      (c/inc! my-counter :with-labels {:rc 500})
-      (is (== 3 @(get my-counter {:rc 500}))))
+      (c/inc! my-counter :with-labels {"rc" 500})
+      (is (== 3 @(get my-counter {"rc" 500}))))
     (testing "Counters may only go up"
       (is (thrown? IllegalArgumentException
-                   (c/inc! my-counter :with-labels {:rc 500} :by -1))))
+                   (c/inc! my-counter :with-labels {"rc" 500} :by -1))))
+    (testing "Labels have to be complete"
+      (is (thrown-with-msg? IllegalArgumentException #"Wrong or insufficient labels provided."
+                            (c/inc! my-counter))))
     (testing "Each label combination is counted by itself"
-      (c/inc! my-counter :with-labels {:rc 200})
-      (is (== 1 @(get my-counter {:rc 200}))))
+      (c/inc! my-counter :with-labels {"rc" 200})
+      (is (== 1 @(get my-counter {"rc" 200}))))
     (testing "counters are collectable"
       (is (= [(c/map->Sample {:name          "my_counter"
                               :description   "blabla"
                               :type          :counter
-                              :label->values {{:rc 200} 1.0 {:rc 500} 3.0}})]
+                              :label->values {{"rc" 200} 1.0 {"rc" 500} 3.0}})]
              (c/collect c/default-registry))))))
 
-(deftest simple-gauge-test
+(deftest labelless-gauge-test
   (let [my-gauge (c/gauge "labelless_gauge" :description "Gauge without labels")]
     (testing "gauges start at zero"
       (is (= 0.0 @my-gauge)))
@@ -77,15 +80,23 @@
       (is (not= my-gauge (c/gauge "labelless_gauge" :registry (c/registry)))))))
 
 (deftest gauge-with-labels-test
-  (testing "labels are possible"
-    (let [my-label-gauge (c/gauge "with_labels" :description "a gauge with labels" :with-labels ["my_label"])]
-      (c/inc! my-label-gauge :with-labels {:my_label :my-val})
-      (c/set! my-label-gauge 2.0 :with-labels {:my_label :my-val}))
-    (is (= [(c/map->Sample {:description   "a gauge with labels"
-                            :label->values {{:my_label :my-val} 2.0}
-                            :name          "with_labels"
-                            :type          :gauge})]
-           (c/collect c/default-registry)))))
+  (let [my-label-gauge (c/gauge "with_labels" :description "a gauge with labels" :with-labels ["my_label"])]
+    (testing "labels are possible"
+      (c/set! my-label-gauge 2.0 :with-labels {"my_label" "my_val"})
+      (c/inc! my-label-gauge :with-labels {"my_label" "my_val"})
+      (c/dec! my-label-gauge :with-labels {"my_label" "my_val"})
+      (is (= [(c/map->Sample {:description   "a gauge with labels"
+                              :label->values {{"my_label" "my_val"} 2.0}
+                              :name          "with_labels"
+                              :type          :gauge})]
+             (c/collect c/default-registry))))
+    (testing "Labels have to be complete"
+      (is (thrown-with-msg? IllegalArgumentException #"Wrong or insufficient labels provided."
+                            (c/inc! my-label-gauge)))
+      (is (thrown-with-msg? IllegalArgumentException #"Wrong or insufficient labels provided."
+                            (c/set! my-label-gauge 3)))
+      (is (thrown-with-msg? IllegalArgumentException #"Wrong or insufficient labels provided."
+                            (c/dec! my-label-gauge))))))
 
 (deftest labeless-histogram-test
   (let [my-histogram (c/histogram "my_histogram")]
@@ -99,7 +110,7 @@
     (testing "histograms have a total count"
       (is (= 1 (:count my-histogram))))
     (testing "histograms have a total sum"
-      (is (= 2(:sum my-histogram))))
+      (is (= 2 (:sum my-histogram))))
     (testing "already registered histograms are returned and not new created"
       (is (= my-histogram (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10]))))
     (testing "histograms are collectable"
@@ -116,14 +127,17 @@
     (testing "histogram exists"
       (is (not= nil my-histogram)))
     (testing "histograms start with all buckets set to zero"
-      (is (= [0.0 0.0 0.0] @(get my-histogram {:test :test}))))
+      (is (= [0.0 0.0 0.0] @(get my-histogram {"test" "test"}))))
     (testing "histograms can observe values"
-      (c/observe! my-histogram 2 :with-labels {:test :best}))
+      (c/observe! my-histogram 2 :with-labels {"test" "best"}))
     (testing "already registered histograms are returned and not new created"
       (is (= my-histogram (c/histogram "histogram_with_labels" :description "histogram with labels" :buckets [0.1 1 10] :with-labels ["test"]))))
     (testing "histograms are collectable"
-      (is (= [(c/->Sample "histogram_with_labels" "histogram with labels" :histogram {{:test :best} '(1.0 1.0 0.0) {:test :test} '(0.0 0.0 0.0)})]
+      (is (= [(c/->Sample "histogram_with_labels" "histogram with labels" :histogram {{"test" "best"} '(1.0 1.0 0.0) {"test" "test"} '(0.0 0.0 0.0)})]
              (c/collect c/default-registry))))
+    (testing "Labels have to be complete"
+      (is (thrown-with-msg? IllegalArgumentException #"Wrong or insufficient labels provided."
+                            (c/observe! my-histogram 1))))
     (testing "histograms cannot have 'le' as a label name"
       (is (thrown-with-msg? IllegalArgumentException #"'le' is a reserved label name for buckets." (c/histogram "le_as_label_name_is_reserved" :with-labels ["le"]))))))
 
