@@ -64,7 +64,7 @@
 (defonce default-registry (registry))
 
 (defrecord Sample [^String name ^String description ^Keyword type label->values])
-
+; deftype instead of defrecord because otherwise we cannot overwrite ILookup which is already implemented by records.
 (deftype Collector [^String metric-name ^String description ^Keyword type ^ConcurrentHashMap label-values->collectors ^PersistentHashSet labels metric-fn]
   ICollector
   (metric-name [_this] metric-name)
