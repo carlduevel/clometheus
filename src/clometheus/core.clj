@@ -6,7 +6,7 @@
 
 (defprotocol ICollectorRegistry
   (fetch [this name type])
-  (register-or-return! [this collector])
+  (register-or-return! [this name type collector-fn])
   (clear! [this])
   (collect [this]))
 
@@ -38,22 +38,20 @@
 
 (extend-type ConcurrentHashMap
   ICollectorRegistry
-  (fetch [this metric-name metric-type]
-    (when-let [found-collector (.get this metric-name)]
-      (if (= (.type found-collector) metric-type)
+  (fetch [this n t]
+    (when-let [found-collector (.get this n)]
+      (if (= (.metric_type found-collector) t)
         found-collector
         (throw (IllegalArgumentException.
                  (format "Metric %s is a %s and not a %s"
-                         metric-name (name (.type found-collector)) (name metric-type)))))))
-  (register-or-return! [this collector]
-    (let [name (.metric_name collector)
-          type (.type collector)]
-      (if-let [found-collector (fetch this name type)]
-        found-collector
-        (do
-          (validate-metric-name name)
-          (validate-label-names (.labels collector))
-          (or (.putIfAbsent this (.metric_name collector) collector) collector)))))
+                         n (name (.metric_type found-collector)) (name t)))))))
+  (register-or-return! [this name type collector-fn]
+    (if-let [found-collector (fetch this name type)]
+      found-collector
+      (let [collector (collector-fn)]
+        (validate-metric-name name)
+        (validate-label-names (.labels collector))
+        (or (.putIfAbsent this (.metric_name collector) collector) collector))))
   (clear! [this] (.clear this))
   (collect [this]
     (map sample (.values this))))
@@ -85,10 +83,6 @@
 ;alter-meta to make it private
 ; must always be the same set of metrics - exception when one is not set?
 
-
-(defn fetch-or-create-collector! [name description labels type metric-fn registry]
-  (register-or-return! registry (->Collector name description type (ConcurrentHashMap.) (set labels) metric-fn)))
-
 (defprotocol Incrementable
   (increment! [this] [this ^Double value]))
 
@@ -104,9 +98,12 @@
       (.add current-val increment)
       (throw (IllegalArgumentException. "Counters cannot be incremented with negative values")))))
 
+(defn counter-collector-fn [name description labels]
+  (fn [] (->Collector name description :counter (ConcurrentHashMap.) (set labels) #(Counter. (DoubleAdder.)))))
+
 (defn counter
   ([name & {description :description labels :with-labels registry :registry :or {labels [] description "" registry default-registry}}]
-   (let [collector (fetch-or-create-collector! name description labels :counter #(Counter. (DoubleAdder.)) registry)]
+   (let [collector (register-or-return! registry name :counter (counter-collector-fn name description labels))]
      (if (empty? labels)
        (get collector {})
        collector))))
@@ -129,9 +126,12 @@
   Resettable
   (reset! [_this new-val] (locking current-val (.reset current-val) (.add current-val new-val))))
 
+(defn gauge-collector-fn [name description labels]
+  (fn [] (->Collector name description :gauge (ConcurrentHashMap.) (set labels) #(Gauge. (DoubleAdder.)))))
+
 (defn gauge
   [name & {description :description labels :with-labels registry :registry :or {labels [] description "" registry default-registry}}]
-  (let [collector (fetch-or-create-collector! name description labels :gauge #(Gauge. (DoubleAdder.)) registry)]
+  (let [collector (register-or-return! registry name :gauge (gauge-collector-fn name description labels))]
     (if (empty? labels)
       (get collector {})
       collector)))
@@ -189,7 +189,6 @@
     (throw (IllegalArgumentException.
              (str "Wrong or insufficient labels provided. All and only these must be set: " (.labels collector))))))
 
-
 (defmethod inc!
   Collector
   ([this & {:keys [with-labels by] :or {with-labels {} by 1}}]
@@ -233,11 +232,14 @@
 (defn- create-histogram! [buckets]
   (->Histogram buckets (for [i (range (count buckets))] (DoubleAdder.)) (DoubleAdder.) (DoubleAdder.)))
 
+(defn histogram-collector-fn [name description labels buckets]
+  #(->Collector name description :histogram (ConcurrentHashMap.) (set labels) (partial create-histogram! (sort buckets))))
+
 (defn histogram [name & {description :description buckets :buckets labels :with-labels registry :registry :or
                                      {buckets [0.005 0.01 0.025 0.05 0.075 0.1 0.25 0.5 0.75 1 2.5 5 7.5 10] labels [] description "" registry default-registry}}]
   (when (contains? (set labels) "le")
     (throw (IllegalArgumentException. "'le' is a reserved label name for buckets.")))
-  (let [collector (fetch-or-create-collector! name description labels :histogram (partial create-histogram! (sort buckets)) registry)]
+  (let [collector (register-or-return! registry name :histogram (histogram-collector-fn name description labels buckets))]
     (if (empty? labels)
       (get collector {})
       collector)))
