@@ -20,16 +20,21 @@
 (def valid-metric-name-re #"[a-zA-Z_:][a-zA-Z0-9_:]*")
 (defn validate-metric-name [name]
   (when-not (re-matches valid-metric-name-re name)
-    (throw (IllegalArgumentException. (str "Invalid metric name: '" name "'. Metric name has to match this regex: [a-zA-Z_:][a-zA-Z0-9_:]*")))))
+    (throw (IllegalArgumentException. (str "Invalid metric name: '" name
+                                           "'. Metric name has to match this regex: [a-zA-Z_:][a-zA-Z0-9_:]*")))))
 
 
 (let [valid-label-re    #"[a-zA-Z_][a-zA-Z0-9_]*"
       reserved-label-re #"__.*"]
   (defn validate-label-name [label-name]
     (when-not (re-matches valid-label-re label-name)
-      (throw (IllegalArgumentException. (str "Invalid label name: '" label-name "'.\n Label name has to match this regex: [a-zA-Z_][a-zA-Z0-9_]*"))))
+      (throw (IllegalArgumentException.
+               (str "Invalid label name: '" label-name
+                    "'.\n Label name has to match this regex: [a-zA-Z_][a-zA-Z0-9_]*"))))
     (when (re-matches reserved-label-re label-name)
-      (throw (IllegalArgumentException. (str "Invalid label name: '" label-name "'.\n Label names beginning with two underscores are reserved for internal use."))))))
+      (throw (IllegalArgumentException.
+               (str "Invalid label name: '" label-name
+                    "'.\n Label names beginning with two underscores are reserved for internal use."))))))
 
 
 (defn validate-label-names [label-names]
@@ -63,13 +68,15 @@
 
 (defrecord Sample [^String name ^String description ^Keyword type label->values])
 ; deftype instead of defrecord because otherwise we cannot overwrite ILookup which is already implemented by records.
-(deftype Collector [^String metric-name ^String description ^Keyword type ^ConcurrentHashMap label-values->collectors ^PersistentHashSet labels metric-fn]
+(deftype Collector [^String metric-name ^String description ^Keyword type ^ConcurrentHashMap label-values->collectors
+                    ^PersistentHashSet labels metric-fn]
   ICollector
   (metric-name [_this] metric-name)
   (description [_this] description)
   (metric-type [this] type)
   (sample [_this]
-    (->Sample metric-name description type (reduce-kv (fn [m k collector] (assoc m k @collector)) {} (into {} label-values->collectors))))
+    (->Sample metric-name description type (reduce-kv (fn [m k collector] (assoc m k @collector)) {}
+                                                      (into {} label-values->collectors))))
   ILookup
   (valAt [this key]
     (if-let [found-metric (.get label-values->collectors key)]
@@ -102,7 +109,8 @@
   (fn [] (->Collector name description :counter (ConcurrentHashMap.) (set labels) #(Counter. (DoubleAdder.)))))
 
 (defn counter
-  ([name & {description :description labels :with-labels registry :registry :or {labels [] description "" registry default-registry}}]
+  ([name & {description :description labels :with-labels registry :registry
+            :or         {labels [] description "" registry default-registry}}]
    (let [collector (register-or-return! registry name :counter (counter-collector-fn name description labels))]
      (if (empty? labels)
        (get collector {})
@@ -130,7 +138,8 @@
   (fn [] (->Collector name description :gauge (ConcurrentHashMap.) (set labels) #(Gauge. (DoubleAdder.)))))
 
 (defn gauge
-  [name & {description :description labels :with-labels registry :registry :or {labels [] description "" registry default-registry}}]
+  [name & {description :description labels :with-labels registry :registry
+           :or         {labels [] description "" registry default-registry}}]
   (let [collector (register-or-return! registry name :gauge (gauge-collector-fn name description labels))]
     (if (empty? labels)
       (get collector {})
@@ -230,16 +239,29 @@
       (throw (Exception. "No labels are possible for simple histogram!")))))
 
 (defn- create-histogram! [buckets]
-  (->Histogram buckets (for [i (range (count buckets))] (DoubleAdder.)) (DoubleAdder.) (DoubleAdder.)))
+  (map->Histogram {:bucket-sizes  buckets
+                   :bucket-adders (for [i (range (count buckets))] (DoubleAdder.))
+                   :sum           (DoubleAdder.)
+                   :count         (DoubleAdder.)}))
 
 (defn histogram-collector-fn [name description labels buckets]
-  #(->Collector name description :histogram (ConcurrentHashMap.) (set labels) (partial create-histogram! (sort buckets))))
+  #(->Collector name description :histogram (ConcurrentHashMap.)
+                (set labels) (partial create-histogram! (sort buckets))))
 
-(defn histogram [name & {description :description buckets :buckets labels :with-labels registry :registry :or
-                                     {buckets [0.005 0.01 0.025 0.05 0.075 0.1 0.25 0.5 0.75 1 2.5 5 7.5 10] labels [] description "" registry default-registry}}]
+(defn histogram [name &
+                 {description :description
+                  buckets     :buckets
+                  labels      :with-labels
+                  registry    :registry
+                  :or
+                              {buckets     [0.005 0.01 0.025 0.05 0.075 0.1 0.25 0.5 0.75 1 2.5 5 7.5 10]
+                               labels      []
+                               description ""
+                               registry    default-registry}}]
   (when (contains? (set labels) "le")
     (throw (IllegalArgumentException. "'le' is a reserved label name for buckets.")))
-  (let [collector (register-or-return! registry name :histogram (histogram-collector-fn name description labels buckets))]
+  (let [collector (register-or-return! registry name :histogram
+                                       (histogram-collector-fn name description labels buckets))]
     (if (empty? labels)
       (get collector {})
       collector)))
