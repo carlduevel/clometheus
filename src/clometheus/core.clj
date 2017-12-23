@@ -15,7 +15,8 @@
   (id [this])
   (description [this])
   (metric-type [this])
-  (sample [this]))
+  (sample [this])
+  (get-or-create-metric! [this labels->vals]))
 
 (def valid-metric-name-re #"[a-zA-Z_:][a-zA-Z0-9_:]*")
 (defn validate-metric-name [name]
@@ -67,8 +68,8 @@
 (defonce default-registry (registry))
 
 (defrecord Sample [^String id ^String description ^Keyword type label->values])
-; deftype instead of defrecord because otherwise we cannot overwrite ILookup which is already implemented by records.
-(deftype Collector [^String id ^String description ^Keyword type ^ConcurrentHashMap label-values->collectors
+
+(defrecord Collector [^String id ^String description ^Keyword type ^ConcurrentHashMap label-values->collectors
                     ^PersistentHashSet labels metric-fn]
   ICollector
   (id [_this] id)
@@ -77,15 +78,12 @@
   (sample [_this]
     (->Sample id description type (reduce-kv (fn [m k collector] (assoc m k @collector)) {}
                                                       (into {} label-values->collectors))))
-  ILookup
-  (valAt [this key]
+  (get-or-create-metric! [this key]
     (if-let [found-metric (.get label-values->collectors key)]
       found-metric
       (let [new-metric         (metric-fn)
             current-val-or-nil (.putIfAbsent label-values->collectors key new-metric)]
-        (or current-val-or-nil new-metric))))
-  (valAt [this key notfound]
-    (throw (UnsupportedOperationException. "Sorry"))))
+        (or current-val-or-nil new-metric)))))
 
 ;alter-meta to make it private
 ; must always be the same set of metrics - exception when one is not set?
@@ -106,14 +104,18 @@
       (throw (IllegalArgumentException. "Counters cannot be incremented with negative values")))))
 
 (defn counter-collector-fn [id description labels]
-  (fn [] (->Collector id description :counter (ConcurrentHashMap.) (set labels) #(Counter. (DoubleAdder.)))))
-
+  (fn [] (map->Collector {:id                       id
+                          :description              description
+                          :type                     :counter
+                          :label-values->collectors (ConcurrentHashMap.)
+                          :labels                   (set labels)
+                          :metric-fn #(Counter. (DoubleAdder.))})))
 (defn counter
   ([id & {description :description labels :with-labels registry :registry
             :or         {labels [] description "" registry default-registry}}]
    (let [collector (register-or-return! registry id :counter (counter-collector-fn id description labels))]
      (if (empty? labels)
-       (get collector {})
+       (get-or-create-metric! collector {})
        collector))))
 
 (defprotocol Decrementable
@@ -135,14 +137,20 @@
   (reset! [_this new-val] (locking current-val (.reset current-val) (.add current-val new-val))))
 
 (defn gauge-collector-fn [id description labels]
-  (fn [] (->Collector id description :gauge (ConcurrentHashMap.) (set labels) #(Gauge. (DoubleAdder.)))))
+  (fn [] (map->Collector
+           {:id                       id
+            :description              description
+            :type                     :gauge
+            :label-values->collectors (ConcurrentHashMap.)
+            :labels                   (set labels)
+            :metric-fn                #(Gauge. (DoubleAdder.))})))
 
 (defn gauge
   [id & {description :description labels :with-labels registry :registry
            :or         {labels [] description "" registry default-registry}}]
   (let [collector (register-or-return! registry id :gauge (gauge-collector-fn id description labels))]
     (if (empty? labels)
-      (get collector {})
+      (get-or-create-metric! collector {})
       collector)))
 
 (defprotocol Observable
@@ -202,25 +210,25 @@
   Collector
   ([this & {:keys [with-labels by] :or {with-labels {} by 1}}]
     (validate-labels this with-labels)
-    (increment! (get this with-labels) (or by 1))))
+    (increment! (get-or-create-metric! this with-labels) (or by 1))))
 
 (defmethod dec!
   Collector
   ([this & {:keys [with-labels by] :or {with-labels {} by 1}}]
     (validate-labels this with-labels)
-    (decrement! (get this with-labels) (or by 1))))
+    (decrement! (get-or-create-metric! this with-labels) (or by 1))))
 
 (defmethod observe!
   Collector
   ([this val & {:keys [with-labels by] :or {with-labels {}}}]
     (validate-labels this with-labels)
-    (observation! (get this with-labels) val)))
+    (observation! (get-or-create-metric! this with-labels) val)))
 
 (defmethod set!
   Collector
   ([this val & {:keys [with-labels] :or {:with-labels {}}}]
     (validate-labels this with-labels)
-    (reset! (get this with-labels) val)))
+    (reset! (get-or-create-metric! this with-labels) val)))
 
 (defrecord Histogram [bucket-sizes bucket-adders count sum]
   IDeref
@@ -245,8 +253,12 @@
                    :count         (DoubleAdder.)}))
 
 (defn histogram-collector-fn [id description labels buckets]
-  #(->Collector id description :histogram (ConcurrentHashMap.)
-                (set labels) (partial create-histogram! (sort buckets))))
+  #(map->Collector {:id                       id
+                    :description              description
+                    :type                     :histogram
+                    :label-values->collectors (ConcurrentHashMap.)
+                    :labels                   (set labels)
+                    :metric-fn                (partial create-histogram! (sort buckets))}))
 
 (defn histogram [id &
                  {description :description
@@ -263,7 +275,7 @@
   (let [collector (register-or-return! registry id :histogram
                                        (histogram-collector-fn id description labels buckets))]
     (if (empty? labels)
-      (get collector {})
+      (get-or-create-metric! collector {})
       collector)))
 
 (defmethod print-method Gauge [h ^Writer writer]

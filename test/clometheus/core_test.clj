@@ -36,10 +36,10 @@
       (is (= Collector (type my-counter))))
     (testing "Incrementing by more than one works"
       (c/inc! my-counter :by 2 :with-labels {"rc" 500})
-      (is (== 2 @(get my-counter {"rc" 500}))))
+      (is (== 2 @(c/get-or-create-metric! my-counter {"rc" 500}))))
     (testing "Incrementing by just one works"
       (c/inc! my-counter :with-labels {"rc" 500})
-      (is (== 3 @(get my-counter {"rc" 500}))))
+      (is (== 3 @(c/get-or-create-metric! my-counter {"rc" 500}))))
     (testing "Counters may only go up"
       (is (thrown? IllegalArgumentException
                    (c/inc! my-counter :with-labels {"rc" 500} :by -1))))
@@ -48,7 +48,7 @@
                             (c/inc! my-counter))))
     (testing "Each label combination is counted by itself"
       (c/inc! my-counter :with-labels {"rc" 200})
-      (is (== 1 @(get my-counter {"rc" 200}))))
+      (is (== 1 @(c/get-or-create-metric! my-counter {"rc" 200}))))
     (testing "counters are collectable"
       (is (= [(c/map->Sample {:id            "my_counter"
                               :description   "blabla"
@@ -127,7 +127,7 @@
     (testing "histogram exists"
       (is (not= nil my-histogram)))
     (testing "histograms start with all buckets set to zero"
-      (is (= [0.0 0.0 0.0] @(get my-histogram {"test" "test"}))))
+      (is (= [0.0 0.0 0.0] @(c/get-or-create-metric! my-histogram {"test" "test"}))))
     (testing "histograms can observe values"
       (c/observe! my-histogram 2 :with-labels {"test" "best"}))
     (testing "already registered histograms are returned and not new created"
