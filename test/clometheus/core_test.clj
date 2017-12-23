@@ -25,7 +25,7 @@
     (testing "already registered counters are returned and not new created"
       (is (= my-counter (c/counter "my_counter"))))
     (testing "counters are collectable"
-      (is (= [(c/map->Sample {:name "my_counter" :description "this is my counter" :type :counter :label->values {{} 3.0}})]
+      (is (= [(c/map->Sample {:id "my_counter" :description "this is my counter" :type :counter :label->values {{} 3.0}})]
              (c/collect c/default-registry))))
     (testing "counters can be registered to other registries than the default one"
       (is (not= my-counter (c/counter "my_counter" :registry (c/registry)))))))
@@ -50,7 +50,7 @@
       (c/inc! my-counter :with-labels {"rc" 200})
       (is (== 1 @(get my-counter {"rc" 200}))))
     (testing "counters are collectable"
-      (is (= [(c/map->Sample {:name          "my_counter"
+      (is (= [(c/map->Sample {:id            "my_counter"
                               :description   "blabla"
                               :type          :counter
                               :label->values {{"rc" 200} 1.0 {"rc" 500} 3.0}})]
@@ -74,7 +74,7 @@
     (testing "gauges are collectable"
       (is (= [(c/map->Sample {:description   "Gauge without labels"
                               :label->values {{} 1.0}
-                              :name          "labelless_gauge"
+                              :id            "labelless_gauge"
                               :type          :gauge})] (c/collect c/default-registry))))
     (testing "gauges can be registered to other registries than the default one"
       (is (not= my-gauge (c/gauge "labelless_gauge" :registry (c/registry)))))))
@@ -87,7 +87,7 @@
       (c/dec! my-label-gauge :with-labels {"my_label" "my_val"})
       (is (= [(c/map->Sample {:description   "a gauge with labels"
                               :label->values {{"my_label" "my_val"} 2.0}
-                              :name          "with_labels"
+                              :id            "with_labels"
                               :type          :gauge})]
              (c/collect c/default-registry))))
     (testing "Labels have to be complete"
@@ -114,7 +114,7 @@
     (testing "already registered histograms are returned and not new created"
       (is (= my-histogram (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10]))))
     (testing "histograms are collectable"
-      (is (= [(c/map->Sample {:name          "my_histogram"
+      (is (= [(c/map->Sample {:id            "my_histogram"
                               :description   nil
                               :type          :histogram
                               :label->values {{} [0.0 0.0 1.0]}})])
@@ -139,7 +139,7 @@
       (is (thrown-with-msg? IllegalArgumentException #"Wrong or insufficient labels provided."
                             (c/observe! my-histogram 1))))
     (testing "histograms cannot have 'le' as a label name"
-      (is (thrown-with-msg? IllegalArgumentException #"'le' is a reserved label name for buckets." (c/histogram "le_as_label_name_is_reserved" :with-labels ["le"]))))))
+      (is (thrown-with-msg? IllegalArgumentException #"'le' is a reserved label for buckets." (c/histogram "le_as_label_name_is_reserved" :with-labels ["le"]))))))
 
 (defn str-represenation [of]
   (let [w (StringWriter.)]
