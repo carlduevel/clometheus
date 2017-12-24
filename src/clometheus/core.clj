@@ -38,6 +38,8 @@
                     "'.\n Label names beginning with two underscores are reserved for internal use."))))))
 
 
+
+
 (defn validate-label-names [label-names]
   (doseq [label label-names]
     (validate-label-name label)))
@@ -69,21 +71,50 @@
 
 (defrecord Sample [^String id ^String description ^Keyword type label->values])
 
+(defprotocol ICountAndSum
+  (count-and-sum! [this v]))
+
+(defprotocol Updates
+  (updates [this]))
+
+(defprotocol Sum
+  (sum [this]))
+
+(defrecord CountAndSum [^DoubleAdder counter ^DoubleAdder summer]
+  ICountAndSum
+  (count-and-sum! [_this v]
+    (.add counter 1.0)
+    (.add summer v))
+  Updates
+  (updates [_this]
+    (.sum counter))
+  Sum
+  (sum [_this]
+    (.sum summer)))
+
 (defrecord Collector [^String id ^String description ^Keyword type ^ConcurrentHashMap label-values->collectors
-                    ^PersistentHashSet labels metric-fn]
+                      ^PersistentHashSet labels metric-fn ^CountAndSum count-and-sum]
   ICollector
   (id [_this] id)
   (description [_this] description)
   (metric-type [this] type)
   (sample [_this]
     (->Sample id description type (reduce-kv (fn [m k collector] (assoc m k @collector)) {}
-                                                      (into {} label-values->collectors))))
+                                             (into {} label-values->collectors))))
   (get-or-create-metric! [this key]
     (if-let [found-metric (.get label-values->collectors key)]
       found-metric
       (let [new-metric         (metric-fn)
             current-val-or-nil (.putIfAbsent label-values->collectors key new-metric)]
-        (or current-val-or-nil new-metric)))))
+        (or current-val-or-nil new-metric))))
+  Updates
+  (updates [_this]
+    (when count-and-sum
+      (.updates count-and-sum)))
+  Sum
+  (sum [_this]
+    (when count-and-sum
+      (.sum count-and-sum))))
 
 ;alter-meta to make it private
 ; must always be the same set of metrics - exception when one is not set?
@@ -109,10 +140,10 @@
                           :type                     :counter
                           :label-values->collectors (ConcurrentHashMap.)
                           :labels                   (set labels)
-                          :metric-fn #(Counter. (DoubleAdder.))})))
+                          :metric-fn                #(Counter. (DoubleAdder.))})))
 (defn counter
   ([id & {description :description labels :with-labels registry :registry
-            :or         {labels [] description "" registry default-registry}}]
+          :or         {labels [] description "" registry default-registry}}]
    (let [collector (register-or-return! registry id :counter (counter-collector-fn id description labels))]
      (if (empty? labels)
        (get-or-create-metric! collector {})
@@ -147,7 +178,7 @@
 
 (defn gauge
   [id & {description :description labels :with-labels registry :registry
-           :or         {labels [] description "" registry default-registry}}]
+         :or         {labels [] description "" registry default-registry}}]
   (let [collector (register-or-return! registry id :gauge (gauge-collector-fn id description labels))]
     (if (empty? labels)
       (get-or-create-metric! collector {})
@@ -230,14 +261,21 @@
     (validate-labels this with-labels)
     (reset! (get-or-create-metric! this with-labels) val)))
 
-(defrecord Histogram [bucket-sizes bucket-adders count sum]
+
+
+(defrecord Histogram [bucket-sizes bucket-adders ^CountAndSum count-and-sum]
   IDeref
   (deref [_this] (map #(.sum %) bucket-adders))
   Observable
   (observation! [this value]
     (doseq [[size bucket] (map list bucket-sizes bucket-adders)] (when (>= value size) (.add bucket 1)))
-    (.add count 1)
-    (.add sum value)))
+    (count-and-sum! count-and-sum value))
+  Updates
+  (updates [_this]
+    (.updates count-and-sum))
+  Sum
+  (sum [_this]
+    (.sum count-and-sum)))
 
 (defmethod observe!
   Histogram
@@ -246,19 +284,20 @@
       (observation! this value)
       (throw (Exception. "No labels are possible for simple histogram!")))))
 
-(defn- create-histogram! [buckets]
+(defn- create-histogram! [buckets ^CountAndSum count-and-sum]
   (map->Histogram {:bucket-sizes  (sort buckets)
                    :bucket-adders (for [i (range (count buckets))] (DoubleAdder.))
-                   :sum           (DoubleAdder.)
-                   :count         (DoubleAdder.)}))
+                   :count-and-sum count-and-sum}))
 
 (defn histogram-collector-fn [id description labels buckets]
-  #(map->Collector {:id                       id
-                    :description              description
-                    :type                     :histogram
-                    :label-values->collectors (ConcurrentHashMap.)
-                    :labels                   (set labels)
-                    :metric-fn                (partial create-histogram! buckets)}))
+  #(let [c-a-s (CountAndSum. (DoubleAdder.) (DoubleAdder.))]
+     (map->Collector {:id                       id
+                      :description              description
+                      :type                     :histogram
+                      :label-values->collectors (ConcurrentHashMap.)
+                      :labels                   (set labels)
+                      :metric-fn                (partial create-histogram! buckets c-a-s)
+                      :count-and-sum            c-a-s})))
 
 (defn histogram [id &
                  {description :description
