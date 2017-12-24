@@ -247,7 +247,7 @@
       (throw (Exception. "No labels are possible for simple histogram!")))))
 
 (defn- create-histogram! [buckets]
-  (map->Histogram {:bucket-sizes  buckets
+  (map->Histogram {:bucket-sizes  (sort buckets)
                    :bucket-adders (for [i (range (count buckets))] (DoubleAdder.))
                    :sum           (DoubleAdder.)
                    :count         (DoubleAdder.)}))
@@ -258,7 +258,7 @@
                     :type                     :histogram
                     :label-values->collectors (ConcurrentHashMap.)
                     :labels                   (set labels)
-                    :metric-fn                (partial create-histogram! (sort buckets))}))
+                    :metric-fn                (partial create-histogram! buckets)}))
 
 (defn histogram [id &
                  {description :description
