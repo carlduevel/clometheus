@@ -104,20 +104,20 @@
                             (c/dec! my-label-gauge))))))
 
 (deftest labeless-histogram-test
-  (let [^Histogram my-histogram (c/histogram "my_histogram")]
+  (let [^Histogram my-histogram (c/histogram "my_histogram" :buckets [1.0 2.0 3.0])]
     (testing "histogram exists"
       (is (not= nil my-histogram)))
     (testing "histograms start with all buckets set to zero"
-      (is (= (repeat 14 0.0) @my-histogram)))
+      (is (= {{:le "1.0"} 0.0 {:le "2.0"} 0.0 {:le "3.0"} 0.0 {:le "+Inf"} 0.0})) @my-histogram)
     (testing "histograms can observe values"
       (c/observe! my-histogram 2)
-      (is (= (concat (repeat 10 1.0) (repeat 4 0.0)) @my-histogram)))
+      (is (= {{:le "1.0"} 0.0 {:le "2.0"} 1.0 {:le "3.0"} 1.0 {:le "+Inf"} 1.0} @my-histogram)))
     (testing "histograms have a total count of updates"
       (is (== 1 (.updates my-histogram))))
     (testing "histograms have a total sum"
       (is (== 2 (.sum my-histogram))))
     (testing "already registered histograms are returned and not new created"
-      (is (= my-histogram (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10]))))
+      (is (= my-histogram (c/histogram "my_histogram"))))
     (testing "histograms are collectable"
       (is (= [(c/map->Sample {:id            "my_histogram"
                               :description   nil
@@ -132,7 +132,7 @@
     (testing "histogram exists"
       (is (not= nil my-histogram)))
     (testing "histograms start with all buckets set to zero"
-      (is (= [0.0 0.0 0.0] @(c/get-or-create-metric! my-histogram {"test" "test"}))))
+      (is (= {{:le "0.1"} 0.0, {:le "1"} 0.0, {:le "10"} 0.0, {:le "+Inf"} 0.0} @(c/get-or-create-metric! my-histogram {"test" "test"}))))
     (testing "histograms can observe values"
       (c/observe! my-histogram 2 :with-labels {"test" "best"}))
     (testing "histograms have a total count of updates"
@@ -142,8 +142,19 @@
     (testing "already registered histograms are returned and not new created"
       (is (= my-histogram (c/histogram "histogram_with_labels" :description "histogram with labels" :buckets [0.1 1 10] :with-labels ["test"]))))
     (testing "histograms are collectable"
-      (is (= [(c/->Sample "histogram_with_labels" "histogram with labels" :histogram {{"test" "best"} '(1.0 1.0 0.0) {"test" "test"} '(0.0 0.0 0.0)})]
-             (c/collect c/default-registry))))
+      (is (= [(c/map->Sample
+                {:id "histogram_with_labels" :description "histogram with labels" :type :histogram
+                 :label->values {
+                                 {:le "0.1", "test" "test"} 0.0
+                                 {:le "1" "test" "test"} 0.0
+                                 {:le "10" "test" "test"} 0.0
+                                 {:le "+Inf" "test" "test"} 0.0
+                                 {:le "0.1" "test" "best"} 0.0
+                                 {:le "1" "test" "best"} 0.0
+                                 {:le "10" "test" "best"} 1.0
+                                 {:le "+Inf" "test" "best"} 1.0}
+                 :total-count 1.0 :total-sum 2.0})]
+              (c/collect c/default-registry))))
     (testing "Labels have to be complete"
       (is (thrown-with-msg? IllegalArgumentException #"Wrong or insufficient labels provided."
                             (c/observe! my-histogram 1))))
@@ -158,7 +169,7 @@
 (deftest all-abstractions-should-be-printable
   (is (= "#clometheus.core.Gauge{:current-val 0.0}" (str-represenation (c/gauge "gauge"))))
   (is (= "#clometheus.core.Counter{:current-val 0.0}" (str-represenation (c/counter "counter"))))
-  (is (= "#clometheus.core.Histogram{:bucket-sizes (0.1 1 10), :bucket-adders (0.0 0.0 0.0), :count-and-sum #clometheus.core.CountAndSum{:counter 0.0, :summer 0.0}}" (str-represenation (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10])))))
+  (is (= "#clometheus.core.Histogram{:bucket-sizes (0.1 1 10), :bucket-adders (0.0 0.0 0.0), :total-bucket 0.0, :count-and-sum #clometheus.core.CountAndSum{:counter 0.0, :summer 0.0}}" (str-represenation (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10])))))
 
 (deftest restriction-on-metric-names-test
   (testing "Special chars are not allowed in a metric name."

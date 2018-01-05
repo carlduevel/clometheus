@@ -69,7 +69,7 @@
 
 (defonce default-registry (registry))
 
-(defrecord Sample [^String id ^String description ^Keyword type label->values])
+(defrecord Sample [^String id ^String description ^Keyword type label->values ^Double total-count ^Double total-sum])
 
 (defprotocol ICountAndSum
   (count-and-sum! [this v]))
@@ -98,9 +98,17 @@
   (id [_this] id)
   (description [_this] description)
   (metric-type [this] type)
-  (sample [_this]
-    (->Sample id description type (reduce-kv (fn [m k collector] (assoc m k @collector)) {}
-                                             (into {} label-values->collectors))))
+  (sample [this]
+    (let [labels->values (reduce-kv (fn [m labels collector]
+                                      (cond
+                                        (number? @collector)
+                                          (assoc m labels @collector)
+                                        (associative? @collector)
+                                          (let [buckets->values @collector]
+                                            (merge m (zipmap (for [bucket (keys buckets->values)] (merge bucket labels)) (vals buckets->values)))))) {}
+                                    (into {} label-values->collectors))]
+
+      (->Sample id description type labels->values (.updates this) (.sum this))))
   (get-or-create-metric! [this key]
     (if-let [found-metric (.get label-values->collectors key)]
       found-metric
@@ -263,12 +271,17 @@
 
 
 
-(defrecord Histogram [bucket-sizes bucket-adders ^CountAndSum count-and-sum]
+(defrecord Histogram [bucket-sizes bucket-adders ^DoubleAdder total-bucket ^CountAndSum count-and-sum]
   IDeref
-  (deref [_this] (map #(.sum %) bucket-adders))
+  (deref [this]
+    (let [buckets       (map #(.sum %)  bucket-adders)
+          bucket-labels (map #(hash-map :le (str %)) bucket-sizes)
+          all-but-inf         (zipmap bucket-labels buckets)]
+            (assoc all-but-inf {:le "+Inf"} (.sum total-bucket))))
   Observable
   (observation! [this value]
-    (doseq [[size bucket] (map list bucket-sizes bucket-adders)] (when (>= value size) (.add bucket 1)))
+    (doseq [[size bucket] (map list bucket-sizes bucket-adders)] (when (<= value size) (.add bucket 1)))
+    (.add total-bucket 1)
     (count-and-sum! count-and-sum value))
   Updates
   (updates [_this]
@@ -286,7 +299,8 @@
 
 (defn- create-histogram! [buckets ^CountAndSum count-and-sum]
   (map->Histogram {:bucket-sizes  (sort buckets)
-                   :bucket-adders (for [i (range (count buckets))] (DoubleAdder.))
+                   :bucket-adders (for [_ (range (count buckets))] (DoubleAdder.))
+                   :total-bucket  (DoubleAdder.)
                    :count-and-sum count-and-sum}))
 
 (defn histogram-collector-fn [id description labels buckets]
