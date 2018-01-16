@@ -259,13 +259,13 @@
 
 (defmethod observe!
   Collector
-  ([this val & {:keys [with-labels by] :or {with-labels {}}}]
+  ([this val & {:keys [with-labels] :or {with-labels {}}}]
     (validate-labels this with-labels)
     (observation! (get-or-create-metric! this with-labels) val)))
 
 (defmethod set!
   Collector
-  ([this val & {:keys [with-labels] :or {:with-labels {}}}]
+  ([this val & {:keys [with-labels] :or {with-labels {}}}]
     (validate-labels this with-labels)
     (reset! (get-or-create-metric! this with-labels) val)))
 
