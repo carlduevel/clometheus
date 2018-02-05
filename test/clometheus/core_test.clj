@@ -1,7 +1,7 @@
 (ns clometheus.core-test
   (:require [clojure.test :refer :all]
             [clometheus.core :as c])
-  (:import (clometheus.core Counter Collector Histogram)
+  (:import (clometheus.core Counter Collector Histogram Summary)
            (java.io StringWriter)))
 
 (defn clear-default-registry [f]
@@ -120,10 +120,15 @@
       (is (= my-histogram (c/histogram "my_histogram"))))
     (testing "histograms are collectable"
       (is (= [(c/map->Sample {:id            "my_histogram"
-                              :description   nil
+                              :description   ""
                               :type          :histogram
-                              :label->values {{} [0.0 0.0 1.0]}})])
-          (c/collect c/default-registry)))
+                              :label->values {{:le "1.0"}  0.0
+                                              {:le "2.0"}  1.0
+                                              {:le "3.0"}  1.0
+                                              {:le "+Inf"} 1.0}
+                              :total-count   1.0
+                              :total-sum     2.0})]
+             (c/collect c/default-registry))))
     (testing "histograms can be registered to other registries than the default one"
       (is (not= my-histogram (c/histogram "my_histogram" :registry (c/registry)))))))
 
@@ -143,23 +148,111 @@
       (is (= my-histogram (c/histogram "histogram_with_labels" :description "histogram with labels" :buckets [0.1 1 10] :with-labels ["test"]))))
     (testing "histograms are collectable"
       (is (= [(c/map->Sample
-                {:id "histogram_with_labels" :description "histogram with labels" :type :histogram
-                 :label->values {
-                                 {:le "0.1", "test" "test"} 0.0
-                                 {:le "1" "test" "test"} 0.0
-                                 {:le "10" "test" "test"} 0.0
+                {:id            "histogram_with_labels"
+                 :description   "histogram with labels"
+                 :type          :histogram
+                 :label->values {{:le "0.1" "test" "test"}  0.0
+                                 {:le "1" "test" "test"}    0.0
+                                 {:le "10" "test" "test"}   0.0
                                  {:le "+Inf" "test" "test"} 0.0
-                                 {:le "0.1" "test" "best"} 0.0
-                                 {:le "1" "test" "best"} 0.0
-                                 {:le "10" "test" "best"} 1.0
+                                 {:le "0.1" "test" "best"}  0.0
+                                 {:le "1" "test" "best"}    0.0
+                                 {:le "10" "test" "best"}   1.0
                                  {:le "+Inf" "test" "best"} 1.0}
-                 :total-count 1.0 :total-sum 2.0})]
-              (c/collect c/default-registry))))
+                 :total-count   1.0
+                 :total-sum     2.0})]
+             (c/collect c/default-registry))))
     (testing "Labels have to be complete"
       (is (thrown-with-msg? IllegalArgumentException #"Wrong or insufficient labels provided."
                             (c/observe! my-histogram 1))))
     (testing "histograms cannot have 'le' as a label name"
-      (is (thrown-with-msg? IllegalArgumentException #"'le' is a reserved label for buckets." (c/histogram "le_as_label_name_is_reserved" :with-labels ["le"]))))))
+      (is (thrown-with-msg? IllegalArgumentException #"'le' is a reserved label for histograms." (c/histogram "le_as_label_name_is_reserved" :with-labels ["le"]))))))
+
+(deftest labeless-summary-wo-quantiles-test
+  (testing "max-age-seconds must be positive"
+    (is (thrown-with-msg? IllegalArgumentException #"Max-age-seconds must be positive\." (c/summary "foo" :max-age-seconds 0))))
+  (testing "age-buckets must be positive"
+    (is (thrown-with-msg? IllegalArgumentException #"Age-buckets must be positive\." (c/summary "foo" :age-buckets 0))))
+  (let [^Summary my-summary (c/summary "my_summary_wo_quantiles")]
+    (testing "summary exists"
+      (is (not= nil my-summary)))
+    (testing "summaries have a total count of updates that start at zero."
+      (is (== 0.0 (.updates my-summary))))
+    (testing "summaries have a total sum that start as zero"
+      (is (== 0.0 (.sum my-summary))))
+    (testing "already registered summaries are returned and not new created"
+      (is (= my-summary (c/summary "my_summary_wo_quantiles"))))
+    (testing "summaries are collectable"
+      (is (= [(c/map->Sample
+                {:id            "my_summary_wo_quantiles"
+                 :description   ""
+                 :type          :summary
+                 :label->values {}
+                 :total-count   0.0
+                 :total-sum     0.0})]
+             (c/collect c/default-registry))))
+    (testing "summarys can be registered to other registries than the default one"
+      (is (not= my-summary (c/summary "my_summary_wo_quantiles" :registry (c/registry)))))))
+
+
+(deftest labeless-summary-with-quantiles-test
+  (let [^Summary my-summary (c/summary "my_summary_with_quantiles" :quantiles [(c/quantile 0.99 0.3) (c/quantile 0.90 0.3) (c/quantile 0.75 0.3) (c/quantile 0.5 0.3)])]
+    (testing "summary exists"
+      (is (not= nil my-summary)))
+    (testing "summaries can observe values"
+      (c/observe! my-summary 2)
+      (is (= {{:quantile "0.5"}  2.0
+              {:quantile "0.75"} 2.0
+              {:quantile "0.9"}  2.0
+              {:quantile "0.99"} 2.0} @my-summary)))
+    (testing "summaries have a total count of updates"
+      (is (== 1 (.updates my-summary))))
+    (testing "summaries have a total sum"
+      (is (== 2 (.sum my-summary))))
+    (testing "already registered summaries are returned and not new created"
+      (is (= my-summary (c/summary "my_summary_with_quantiles"))))
+    (testing "summaries are collectable"
+      (is (= [(c/map->Sample
+                {:id            "my_summary_with_quantiles"
+                 :description   ""
+                 :type          :summary
+                 :label->values {{:quantile "0.5"}  2.0
+                                 {:quantile "0.75"} 2.0
+                                 {:quantile "0.9"}  2.0
+                                 {:quantile "0.99"} 2.0}
+                 :total-count   1.0
+                 :total-sum     2.0})]
+             (c/collect c/default-registry))))
+    (testing "summarys can be registered to other registries than the default one"
+      (is (not= my-summary (c/summary "my_summary_with_quantiles" :registry (c/registry)))))))
+
+(deftest summary-with-quantiles-test
+  (testing "quantile is not a valid label for summaries"
+    (is (thrown-with-msg? IllegalArgumentException #"'quantile' is a reserved label for summaries." (c/summary "foo" :with-labels ["bar" "quantile"]))))
+  (let [^Summary my-summary (c/summary "my_summary_with_quantiles_and_labels" :quantiles [(c/quantile 0.75 0.3) (c/quantile 0.99 0.3)] :with-labels ["status"])]
+    (testing "summary exists"
+      (is (not= nil my-summary)))
+    (testing "summaries can observe values"
+      (c/observe! my-summary 2 :with-labels {"status" "ok"}))
+    (testing "already registered summaries are returned and not new created"
+      (is (= my-summary (c/summary "my_summary_with_quantiles_and_labels" :with-labels ["status"]))))
+    (testing "summaries are collectable"
+      (is (= [(c/map->Sample
+                (c/map->Sample {:description   ""
+                                :id            "my_summary_with_quantiles_and_labels"
+                                :label->values {{"status"  "ok"
+                                                 :quantile "0.75"} 2.0
+                                                {"status"  "ok"
+                                                 :quantile "0.99"} 2.0}
+                                :total-count   1.0
+                                :total-sum     2.0
+                                :type          :summary}))]
+             (c/collect c/default-registry))))
+    (testing "summarys can be registered to other registries than the default one"
+      (is (not= my-summary (c/summary "my_summary_with_quantiles_and_labels" :registry (c/registry)))))))
+
+
+
 
 (defn str-represenation [of]
   (let [w (StringWriter.)]

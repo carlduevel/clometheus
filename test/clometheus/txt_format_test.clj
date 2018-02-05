@@ -59,3 +59,16 @@
                       "my_histogram_sum 1.0\n")]
     (is (= expected actual))))
 
+(deftest summaries-are-handled
+  (let [summary      (c/summary "my_summary" :with-labels ["foo"] :quantiles [(c/quantile 0.99 0.03)(c/quantile 0.95 0.03)])
+        _      (c/observe! summary 1 :with-labels {"foo" "bar"})
+        actual (-> (StringWriter.) (f/write (.sample summary)) (.toString))
+        expected (str "# HELP my_summary \n"
+                      "# TYPE my_summary summary\n"
+                      "my_summary {foo=\"bar\",quantile=\"0.99\",} 1.0\n"
+                      "my_summary {foo=\"bar\",quantile=\"0.95\",} 1.0\n"
+                      "my_summary_count 1.0\n"
+                      "my_summary_sum 1.0\n")]
+    (is (= expected actual))))
+
+

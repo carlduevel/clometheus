@@ -2,7 +2,8 @@
   (:import (java.util.concurrent ConcurrentHashMap)
            (java.util.concurrent.atomic DoubleAdder)
            (clojure.lang ILookup Keyword IDeref ExceptionInfo IRecord PersistentHashSet)
-           (java.io Writer)))
+           (java.io Writer)
+           (clometheus CKMSQuantiles$Quantile TimeWindowQuantiles)))
 
 (defprotocol ICollectorRegistry
   (fetch [this name type])
@@ -102,10 +103,10 @@
     (let [labels->values (reduce-kv (fn [m labels collector]
                                       (cond
                                         (number? @collector)
-                                          (assoc m labels @collector)
+                                        (assoc m labels @collector)
                                         (associative? @collector)
-                                          (let [buckets->values @collector]
-                                            (merge m (zipmap (for [bucket (keys buckets->values)] (merge bucket labels)) (vals buckets->values)))))) {}
+                                        (let [buckets->values @collector]
+                                          (merge m (zipmap (for [bucket (keys buckets->values)] (merge bucket labels)) (vals buckets->values)))))) {}
                                     (into {} label-values->collectors))]
 
       (->Sample id description type labels->values (.updates this) (.sum this))))
@@ -274,10 +275,10 @@
 (defrecord Histogram [bucket-sizes bucket-adders ^DoubleAdder total-bucket ^CountAndSum count-and-sum]
   IDeref
   (deref [this]
-    (let [buckets       (map #(.sum %)  bucket-adders)
+    (let [buckets       (map #(.sum %) bucket-adders)
           bucket-labels (map #(hash-map :le (str %)) bucket-sizes)
-          all-but-inf         (zipmap bucket-labels buckets)]
-            (assoc all-but-inf {:le "+Inf"} (.sum total-bucket))))
+          all-but-inf   (zipmap bucket-labels buckets)]
+      (assoc all-but-inf {:le "+Inf"} (.sum total-bucket))))
   Observable
   (observation! [this value]
     (doseq [[size bucket] (map list bucket-sizes bucket-adders)] (when (<= value size) (.add bucket 1)))
@@ -303,7 +304,7 @@
                    :total-bucket  (DoubleAdder.)
                    :count-and-sum count-and-sum}))
 
-(defn histogram-collector-fn [id description labels buckets]
+(defn- histogram-collector-fn [id description labels buckets]
   #(let [c-a-s (CountAndSum. (DoubleAdder.) (DoubleAdder.))]
      (map->Collector {:id                       id
                       :description              description
@@ -324,12 +325,88 @@
                                description ""
                                registry    default-registry}}]
   (when (contains? (set labels) "le")
-    (throw (IllegalArgumentException. "'le' is a reserved label for buckets.")))
+    (throw (IllegalArgumentException. "'le' is a reserved label for histograms.")))
   (let [collector (register-or-return! registry id :histogram
                                        (histogram-collector-fn id description labels buckets))]
     (if (empty? labels)
       (get-or-create-metric! collector {})
       collector)))
+
+(defrecord Summary [^CountAndSum count-and-sum ^TimeWindowQuantiles time-window-quantiles]
+  IDeref
+  (deref [this]
+    (let [all-quantiles (map #(.quantile %) (.quantiles time-window-quantiles))
+          bucket-labels (map #(hash-map :quantile (str %)) all-quantiles)
+          quantile-vals (map #(.get time-window-quantiles %) all-quantiles)]
+      (zipmap bucket-labels quantile-vals)))
+  Observable
+  (observation! [this value]
+    (.insert time-window-quantiles value)
+    (count-and-sum! count-and-sum value))
+  Updates
+  (updates [_this]
+    (.updates count-and-sum))
+  Sum
+  (sum [_this]
+    (.sum count-and-sum)))
+
+(defn- prob? [^double prob]
+  (<= 0.0 prob 1.0))
+
+(defn- validate-quantile [^double quantile, ^double error]
+  (when (not (prob? quantile))
+    (throw (IllegalArgumentException. "Quantile must be a value between 0.0 and 1.0.")))
+  (when (not (prob? error))
+    (throw (IllegalArgumentException. "Error must be a value between 0.0 and 1.0."))))
+
+
+(defn quantile [^double quantile, ^double error]
+  (validate-quantile quantile error)
+  (CKMSQuantiles$Quantile. quantile error))
+
+(defn- summary-collector-fn [id description labels ^TimeWindowQuantiles twq]
+  #(let [c-a-s (CountAndSum. (DoubleAdder.) (DoubleAdder.))]
+     (map->Collector {:id                       id
+                      :description              description
+                      :type                     :summary
+                      :label-values->collectors (ConcurrentHashMap.)
+                      :labels                   (set labels)
+                      :metric-fn                (fn [] (Summary. c-a-s twq))
+                      :count-and-sum            c-a-s})))
+
+(defn summary [id &
+               {description           :description
+                labels                :with-labels
+                registry              :registry
+                ^long max-age-seconds :max-age-seconds
+                ^int age-buckets      :age-buckets
+                quantiles             :quantiles
+                :or
+                                      {max-age-seconds 600
+                                       age-buckets     5
+                                       quantiles       []
+                                       description ""
+                                       registry    default-registry}}]
+  (when (contains? (set labels) "quantile")
+    (throw (IllegalArgumentException. "'quantile' is a reserved label for summaries.")))
+  (when (<= max-age-seconds 0)
+    (throw (IllegalArgumentException. "Max-age-seconds must be positive.")))
+  (when (<= age-buckets 0)
+    (throw (IllegalArgumentException. "Age-buckets must be positive.")))
+  (let [quantiles (into-array CKMSQuantiles$Quantile quantiles)
+        twqs      (TimeWindowQuantiles. quantiles max-age-seconds age-buckets)
+        collector (register-or-return! registry id :summary
+                                       (summary-collector-fn id description labels twqs))]
+    (if (empty? labels)
+      (get-or-create-metric! collector {})
+      collector)))
+
+(defmethod observe!
+  Summary
+  ([this value & {:keys [with-labels] :or {with-labels {}}}]
+    (if (empty? with-labels)
+      (observation! this value)
+      (throw (Exception. "No labels are possible for simple Summary!")))))
 
 (defmethod print-method Gauge [h ^Writer writer]
   ((get-method print-method IRecord) h writer))
@@ -338,4 +415,7 @@
   ((get-method print-method IRecord) h writer))
 
 (defmethod print-method Histogram [h ^Writer writer]
+  ((get-method print-method IRecord) h writer))
+
+(defmethod print-method Summary [h ^Writer writer]
   ((get-method print-method IRecord) h writer))
