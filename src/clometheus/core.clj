@@ -149,7 +149,7 @@
                           :labels                   (set labels)
                           :metric-fn                #(Counter. (DoubleAdder.))})))
 (defn counter
-  ([id & {description :description labels :with-labels registry :registry
+  ([id & {description :description labels :labels registry :registry
           :or         {labels [] description "" registry default-registry}}]
    (let [collector (register-or-return! registry id :counter (counter-collector-fn id description labels))]
      (if (empty? labels)
@@ -184,7 +184,7 @@
             :metric-fn                #(Gauge. (DoubleAdder.))})))
 
 (defn gauge
-  [id & {description :description labels :with-labels registry :registry
+  [id & {description :description labels :labels registry :registry
          :or         {labels [] description "" registry default-registry}}]
   (let [collector (register-or-return! registry id :gauge (gauge-collector-fn id description labels))]
     (if (empty? labels)
@@ -213,29 +213,29 @@
 
 (defmethod inc!
   Counter
-  ([this & {:keys [with-labels by] :or {with-labels {} by 1}}]
-    (if (empty? with-labels)
+  ([this & {:keys [labels by] :or {labels {} by 1}}]
+    (if (empty? labels)
       (increment! this by)
       (throw (Exception. "No labels are possible for simple counter!")))))
 
 (defmethod inc!
   Gauge
-  ([this & {:keys [with-labels by] :or {with-labels {} by 1}}]
-    (if (empty? with-labels)
+  ([this & {:keys [labels by] :or {labels {} by 1}}]
+    (if (empty? labels)
       (increment! this by)
       (throw (Exception. "No labels are possible for simple gauge!")))))
 
 (defmethod dec!
   Gauge
-  ([this & {:keys [with-labels by] :or {with-labels {} by 1}}]
-    (if (empty? with-labels)
+  ([this & {:keys [labels by] :or {labels {} by 1}}]
+    (if (empty? labels)
       (decrement! this by)
       (throw (Exception. "No labels are possible for simple gauge!")))))
 
 (defmethod set!
   Gauge
-  ([this val & {:keys [with-labels] :or {with-labels {}}}]
-    (if (empty? with-labels)
+  ([this val & {:keys [labels] :or {labels {}}}]
+    (if (empty? labels)
       (reset! this val)
       (throw (Exception. "No labels are possible for simple gauge!")))))
 
@@ -246,27 +246,27 @@
 
 (defmethod inc!
   Collector
-  ([this & {:keys [with-labels by] :or {with-labels {} by 1}}]
-    (validate-labels this with-labels)
-    (increment! (get-or-create-metric! this with-labels) (or by 1))))
+  ([this & {:keys [labels by] :or {labels {} by 1}}]
+    (validate-labels this labels)
+    (increment! (get-or-create-metric! this labels) (or by 1))))
 
 (defmethod dec!
   Collector
-  ([this & {:keys [with-labels by] :or {with-labels {} by 1}}]
-    (validate-labels this with-labels)
-    (decrement! (get-or-create-metric! this with-labels) (or by 1))))
+  ([this & {:keys [labels by] :or {labels {} by 1}}]
+    (validate-labels this labels)
+    (decrement! (get-or-create-metric! this labels) (or by 1))))
 
 (defmethod observe!
   Collector
-  ([this val & {:keys [with-labels] :or {with-labels {}}}]
-    (validate-labels this with-labels)
-    (observation! (get-or-create-metric! this with-labels) val)))
+  ([this val & {:keys [labels] :or {labels {}}}]
+    (validate-labels this labels)
+    (observation! (get-or-create-metric! this labels) val)))
 
 (defmethod set!
   Collector
-  ([this val & {:keys [with-labels] :or {with-labels {}}}]
-    (validate-labels this with-labels)
-    (reset! (get-or-create-metric! this with-labels) val)))
+  ([this val & {:keys [labels] :or {labels {}}}]
+    (validate-labels this labels)
+    (reset! (get-or-create-metric! this labels) val)))
 
 
 
@@ -291,8 +291,8 @@
 
 (defmethod observe!
   Histogram
-  ([this value & {:keys [with-labels] :or {with-labels {}}}]
-    (if (empty? with-labels)
+  ([this value & {:keys [labels] :or {labels {}}}]
+    (if (empty? labels)
       (observation! this value)
       (throw (Exception. "No labels are possible for simple histogram!")))))
 
@@ -315,7 +315,7 @@
 (defn histogram [id &
                  {description :description
                   buckets     :buckets
-                  labels      :with-labels
+                  labels      :labels
                   registry    :registry
                   :or
                               {buckets     [0.005 0.01 0.025 0.05 0.075 0.1 0.25 0.5 0.75 1 2.5 5 7.5 10]
@@ -374,7 +374,7 @@
 
 (defn summary [id &
                {description           :description
-                labels                :with-labels
+                labels                :labels
                 registry              :registry
                 ^long max-age-seconds :max-age-seconds
                 ^int age-buckets      :age-buckets
@@ -401,8 +401,8 @@
 
 (defmethod observe!
   Summary
-  ([this value & {:keys [with-labels] :or {with-labels {}}}]
-    (if (empty? with-labels)
+  ([this value & {:keys [labels] :or {labels {}}}]
+    (if (empty? labels)
       (observation! this value)
       (throw (Exception. "No labels are possible for simple Summary!")))))
 

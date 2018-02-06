@@ -30,19 +30,19 @@
     (testing "counters can be registered to other registries than the default one"
       (is (not= my-counter (c/counter "my_counter" :registry (c/registry)))))))
 
-(deftest counter-with-labels-test
-  (let [my-counter (c/counter "my_counter" :description "blabla" :with-labels ["rc"])]
+(deftest counter-labels-test
+  (let [my-counter (c/counter "my_counter" :description "blabla" :labels ["rc"])]
     (testing "Labels are managed by Collectors"
       (is (= Collector (type my-counter))))
     (testing "Incrementing by more than one works"
-      (c/inc! my-counter :by 2 :with-labels {"rc" 500})
+      (c/inc! my-counter :by 2 :labels {"rc" 500})
       (is (== 2 @(c/get-or-create-metric! my-counter {"rc" 500}))))
     (testing "Incrementing by just one works"
-      (c/inc! my-counter :with-labels {"rc" 500})
+      (c/inc! my-counter :labels {"rc" 500})
       (is (== 3 @(c/get-or-create-metric! my-counter {"rc" 500}))))
     (testing "Counters may only go up"
       (is (thrown? IllegalArgumentException
-                   (c/inc! my-counter :with-labels {"rc" 500} :by -1))))
+                   (c/inc! my-counter :labels {"rc" 500} :by -1))))
     (testing "Labels have to be complete"
       (is (thrown-with-msg? IllegalArgumentException #"Wrong or insufficient labels provided."
                             (c/inc! my-counter))))
@@ -52,7 +52,7 @@
       (is (= nil (.updates my-counter))))
 
     (testing "Each label combination is counted by itself"
-      (c/inc! my-counter :with-labels {"rc" 200})
+      (c/inc! my-counter :labels {"rc" 200})
       (is (== 1 @(c/get-or-create-metric! my-counter {"rc" 200}))))
     (testing "counters are collectable"
       (is (= [(c/map->Sample {:id            "my_counter"
@@ -84,12 +84,12 @@
     (testing "gauges can be registered to other registries than the default one"
       (is (not= my-gauge (c/gauge "labelless_gauge" :registry (c/registry)))))))
 
-(deftest gauge-with-labels-test
-  (let [my-label-gauge (c/gauge "with_labels" :description "a gauge with labels" :with-labels ["my_label"])]
+(deftest gauge-labels-test
+  (let [my-label-gauge (c/gauge "with_labels" :description "a gauge with labels" :labels ["my_label"])]
     (testing "labels are possible"
-      (c/set! my-label-gauge 2.0 :with-labels {"my_label" "my_val"})
-      (c/inc! my-label-gauge :with-labels {"my_label" "my_val"})
-      (c/dec! my-label-gauge :with-labels {"my_label" "my_val"})
+      (c/set! my-label-gauge 2.0 :labels {"my_label" "my_val"})
+      (c/inc! my-label-gauge :labels {"my_label" "my_val"})
+      (c/dec! my-label-gauge :labels {"my_label" "my_val"})
       (is (= [(c/map->Sample {:description   "a gauge with labels"
                               :label->values {{"my_label" "my_val"} 2.0}
                               :id            "with_labels"
@@ -132,20 +132,20 @@
     (testing "histograms can be registered to other registries than the default one"
       (is (not= my-histogram (c/histogram "my_histogram" :registry (c/registry)))))))
 
-(deftest histogram-with-labels-test
-  (let [my-histogram (c/histogram "histogram_with_labels" :description "histogram with labels" :buckets [0.1 1 10] :with-labels ["test"])]
+(deftest histogram-labels-test
+  (let [my-histogram (c/histogram "histogram_with_labels" :description "histogram with labels" :buckets [0.1 1 10] :labels ["test"])]
     (testing "histogram exists"
       (is (not= nil my-histogram)))
     (testing "histograms start with all buckets set to zero"
       (is (= {{:le "0.1"} 0.0, {:le "1"} 0.0, {:le "10"} 0.0, {:le "+Inf"} 0.0} @(c/get-or-create-metric! my-histogram {"test" "test"}))))
     (testing "histograms can observe values"
-      (c/observe! my-histogram 2 :with-labels {"test" "best"}))
+      (c/observe! my-histogram 2 :labels {"test" "best"}))
     (testing "histograms have a total count of updates"
       (is (== 1 (.updates my-histogram))))
     (testing "histograms have a total sum"
       (is (== 2 (.sum my-histogram))))
     (testing "already registered histograms are returned and not new created"
-      (is (= my-histogram (c/histogram "histogram_with_labels" :description "histogram with labels" :buckets [0.1 1 10] :with-labels ["test"]))))
+      (is (= my-histogram (c/histogram "histogram_with_labels" :description "histogram with labels" :buckets [0.1 1 10] :labels ["test"]))))
     (testing "histograms are collectable"
       (is (= [(c/map->Sample
                 {:id            "histogram_with_labels"
@@ -166,7 +166,7 @@
       (is (thrown-with-msg? IllegalArgumentException #"Wrong or insufficient labels provided."
                             (c/observe! my-histogram 1))))
     (testing "histograms cannot have 'le' as a label name"
-      (is (thrown-with-msg? IllegalArgumentException #"'le' is a reserved label for histograms." (c/histogram "le_as_label_name_is_reserved" :with-labels ["le"]))))))
+      (is (thrown-with-msg? IllegalArgumentException #"'le' is a reserved label for histograms." (c/histogram "le_as_label_name_is_reserved" :labels ["le"]))))))
 
 (deftest labeless-summary-wo-quantiles-test
   (testing "max-age-seconds must be positive"
@@ -228,14 +228,14 @@
 
 (deftest summary-with-quantiles-test
   (testing "quantile is not a valid label for summaries"
-    (is (thrown-with-msg? IllegalArgumentException #"'quantile' is a reserved label for summaries." (c/summary "foo" :with-labels ["bar" "quantile"]))))
-  (let [^Summary my-summary (c/summary "my_summary_with_quantiles_and_labels" :quantiles [(c/quantile 0.75 0.3) (c/quantile 0.99 0.3)] :with-labels ["status"])]
+    (is (thrown-with-msg? IllegalArgumentException #"'quantile' is a reserved label for summaries." (c/summary "foo" :labels ["bar" "quantile"]))))
+  (let [^Summary my-summary (c/summary "my_summary_with_quantiles_and_labels" :quantiles [(c/quantile 0.75 0.3) (c/quantile 0.99 0.3)] :labels ["status"])]
     (testing "summary exists"
       (is (not= nil my-summary)))
     (testing "summaries can observe values"
-      (c/observe! my-summary 2 :with-labels {"status" "ok"}))
+      (c/observe! my-summary 2 :labels {"status" "ok"}))
     (testing "already registered summaries are returned and not new created"
-      (is (= my-summary (c/summary "my_summary_with_quantiles_and_labels" :with-labels ["status"]))))
+      (is (= my-summary (c/summary "my_summary_with_quantiles_and_labels" :labels ["status"]))))
     (testing "summaries are collectable"
       (is (= [(c/map->Sample
                 (c/map->Sample {:description   ""
@@ -268,12 +268,12 @@
   (testing "Special chars are not allowed in a metric name."
     (is (thrown-with-msg? IllegalArgumentException #"Invalid metric name:" (c/gauge "%!=!"))))
   (testing "Label names must not contain dashes."
-    (is (thrown-with-msg? IllegalArgumentException #"Invalid label name:" (c/gauge "legal_name" :with-labels ["illlegal-label"]))))
+    (is (thrown-with-msg? IllegalArgumentException #"Invalid label name:" (c/gauge "legal_name" :labels ["illlegal-label"]))))
   (testing "Label names starting with two dashes are reserved for internal use."
     (is (thrown-with-msg?
           IllegalArgumentException
           #"Invalid label name: '__internal_label'.\n Label names beginning with two underscores are reserved for internal use."
-          (c/gauge "legal_name" :with-labels ["__internal_label"]))))
+          (c/gauge "legal_name" :labels ["__internal_label"]))))
   (testing "Two different metrics cannot be registered under the same name."
     (is (thrown-with-msg? IllegalArgumentException
                           #"Metric my_metric is a counter and not a gauge"
