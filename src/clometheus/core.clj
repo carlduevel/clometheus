@@ -19,13 +19,11 @@
   (sample [this])
   (get-or-create-metric! [this labels->vals]))
 
-(def valid-metric-name-re #"[a-zA-Z_:][a-zA-Z0-9_:]*")
-(defn validate-metric-name [name]
+(def ^:private valid-metric-name-re #"[a-zA-Z_:][a-zA-Z0-9_:]*")
+(defn- validate-metric-name [name]
   (when-not (re-matches valid-metric-name-re name)
     (throw (IllegalArgumentException. (str "Invalid metric name: '" name
                                            "'. Metric name has to match this regex: [a-zA-Z_:][a-zA-Z0-9_:]*")))))
-
-
 (let [valid-label-re    #"[a-zA-Z_][a-zA-Z0-9_]*"
       reserved-label-re #"__.*"]
   (defn validate-label-name [label-name]
@@ -41,7 +39,7 @@
 
 
 
-(defn validate-label-names [label-names]
+(defn- validate-label-names [label-names]
   (doseq [label label-names]
     (validate-label-name label)))
 
@@ -143,7 +141,7 @@
       (.add current-val increment)
       (throw (IllegalArgumentException. "Counters cannot be incremented with negative values")))))
 
-(defn counter-collector-fn [id description labels]
+(defn- counter-collector-fn [id description labels]
   (fn [] (map->Collector {:id                       id
                           :description              description
                           :type                     :counter
@@ -176,7 +174,7 @@
   Resettable
   (reset! [_this new-val] (locking current-val (.reset current-val) (.add current-val new-val))))
 
-(defn gauge-collector-fn [id description labels]
+(defn- gauge-collector-fn [id description labels]
   (fn [] (map->Collector
            {:id                       id
             :description              description
@@ -196,13 +194,13 @@
 (defprotocol Observable
   (observation! [this value]))
 
-(defn type-dispatch-one-or-more-args
+(defn- type-dispatch-one-or-more-args
   ([this]
    (type this))
   ([this & opts]
    (type this)))
 
-(defn type-dispatch-2-or-more-args
+(defn- type-dispatch-2-or-more-args
   ([this val]
    (type this))
   ([this val & opts]
@@ -241,7 +239,7 @@
       (reset! this val)
       (throw (Exception. "No labels are possible for simple gauge!")))))
 
-(defn validate-labels [^Collector collector labels->values]
+(defn- validate-labels [^Collector collector labels->values]
   (when-not (= (.labels collector) (set (keys labels->values)))
     (throw (IllegalArgumentException.
              (str "Wrong or insufficient labels provided. All and only these must be set: " (.labels collector))))))
