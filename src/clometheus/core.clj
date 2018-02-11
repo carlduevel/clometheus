@@ -352,9 +352,9 @@
   (<= 0.0 prob 1.0))
 
 (defn- validate-quantile [^double quantile, ^double error]
-  (when (not (prob? quantile))
+  (when-not (prob? quantile)
     (throw (IllegalArgumentException. "Quantile must be a value between 0.0 and 1.0.")))
-  (when (not (prob? error))
+  (when-not (prob? error)
     (throw (IllegalArgumentException. "Error must be a value between 0.0 and 1.0."))))
 
 
