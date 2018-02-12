@@ -1,7 +1,7 @@
 (ns clometheus.core
   (:import (java.util.concurrent ConcurrentHashMap)
            (java.util.concurrent.atomic DoubleAdder)
-           (clojure.lang ILookup Keyword IDeref ExceptionInfo IRecord PersistentHashSet)
+           (clojure.lang Keyword IDeref IRecord PersistentHashSet)
            (java.io Writer)
            (clometheus CKMSQuantiles$Quantile TimeWindowQuantiles)))
 
@@ -96,7 +96,7 @@
   ICollector
   (id [_this] id)
   (description [_this] description)
-  (metric-type [this] type)
+  (metric-type [_this] type)
   (sample [this]
     (let [labels->values (reduce-kv (fn [m labels collector]
                                       (cond
@@ -108,7 +108,7 @@
                                     (into {} label-values->collectors))]
 
       (->Sample id description type labels->values (.updates this) (.sum this))))
-  (get-or-create-metric! [this key]
+  (get-or-create-metric! [_this key]
     (if-let [found-metric (.get label-values->collectors key)]
       found-metric
       (let [new-metric         (metric-fn)
@@ -197,13 +197,13 @@
 (defn- type-dispatch-one-or-more-args
   ([this]
    (type this))
-  ([this & opts]
+  ([this & _opts]
    (type this)))
 
 (defn- type-dispatch-2-or-more-args
-  ([this val]
+  ([this _val]
    (type this))
-  ([this val & opts]
+  ([this _val & _opts]
    (type this)))
 
 (defmulti inc! type-dispatch-one-or-more-args)
@@ -272,13 +272,13 @@
 
 (defrecord Histogram [bucket-sizes bucket-adders ^DoubleAdder total-bucket ^CountAndSum count-and-sum]
   IDeref
-  (deref [this]
+  (deref [_this]
     (let [buckets       (map #(.sum %) bucket-adders)
           bucket-labels (map #(hash-map :le (str %)) bucket-sizes)
           all-but-inf   (zipmap bucket-labels buckets)]
       (assoc all-but-inf {:le "+Inf"} (.sum total-bucket))))
   Observable
-  (observation! [this value]
+  (observation! [_this value]
     (doseq [[size bucket] (map list bucket-sizes bucket-adders)] (when (<= value size) (.add bucket 1)))
     (.add total-bucket 1)
     (count-and-sum! count-and-sum value))
@@ -332,13 +332,13 @@
 
 (defrecord Summary [^CountAndSum count-and-sum ^TimeWindowQuantiles time-window-quantiles]
   IDeref
-  (deref [this]
+  (deref [_this]
     (let [all-quantiles (map #(.quantile %) (.quantiles time-window-quantiles))
           bucket-labels (map #(hash-map :quantile (str %)) all-quantiles)
           quantile-vals (map #(.get time-window-quantiles %) all-quantiles)]
       (zipmap bucket-labels quantile-vals)))
   Observable
-  (observation! [this value]
+  (observation! [_this value]
     (.insert time-window-quantiles value)
     (count-and-sum! count-and-sum value))
   Updates
