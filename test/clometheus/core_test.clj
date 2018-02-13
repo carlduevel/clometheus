@@ -1,7 +1,7 @@
 (ns clometheus.core-test
   (:require [clojure.test :refer :all]
             [clometheus.core :as c])
-  (:import (clometheus.core Counter Collector Histogram Summary)
+  (:import (clometheus.core Collector Histogram Summary)
            (java.io StringWriter)))
 
 (defn clear-default-registry [f]
@@ -279,4 +279,3 @@
                           #"Metric my_metric is a counter and not a gauge"
                           (c/counter "my_metric")
                           (c/gauge "my_metric")))))
-

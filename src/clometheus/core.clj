@@ -91,6 +91,9 @@
   (sum [_this]
     (.sum summer)))
 
+(alter-meta! #'map->CountAndSum assoc :private true)
+(alter-meta! #'->CountAndSum assoc :private true)
+
 (defrecord Collector [^String id ^String description ^Keyword type ^ConcurrentHashMap label-values->collectors
                       ^PersistentHashSet labels metric-fn ^CountAndSum count-and-sum]
   ICollector
@@ -123,8 +126,9 @@
     (when count-and-sum
       (.sum count-and-sum))))
 
-;alter-meta to make it private
-; must always be the same set of metrics - exception when one is not set?
+(alter-meta! #'map->Collector assoc :private true)
+(alter-meta! #'->Collector assoc :private true)
+
 
 (defprotocol Incrementable
   (increment! [this] [this ^Double value]))
@@ -140,6 +144,9 @@
     (if (pos? increment)
       (.add current-val increment)
       (throw (IllegalArgumentException. "Counters cannot be incremented with negative values")))))
+
+(alter-meta! #'map->Counter assoc :private true)
+(alter-meta! #'->Counter assoc :private true)
 
 (defn- counter-collector-fn [id description labels]
   (fn [] (map->Collector {:id                       id
@@ -173,6 +180,10 @@
   (decrement! [_this val] (.add current-val (* -1 val)))
   Resettable
   (reset! [_this new-val] (locking current-val (.reset current-val) (.add current-val new-val))))
+
+(alter-meta! #'map->Gauge assoc :private true)
+(alter-meta! #'->Gauge assoc :private true)
+
 
 (defn- gauge-collector-fn [id description labels]
   (fn [] (map->Collector
@@ -289,6 +300,10 @@
   (sum [_this]
     (.sum count-and-sum)))
 
+(alter-meta! #'map->Histogram assoc :private true)
+(alter-meta! #'->Histogram assoc :private true)
+
+
 (defmethod observe!
   Histogram
   ([this value & {:keys [labels] :or {labels {}}}]
@@ -347,6 +362,9 @@
   Sum
   (sum [_this]
     (.sum count-and-sum)))
+
+(alter-meta! #'map->Summary assoc :private true)
+(alter-meta! #'->Summary assoc :private true)
 
 (defn- prob? [^double prob]
   (<= 0.0 prob 1.0))
