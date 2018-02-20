@@ -169,6 +169,10 @@
 (defprotocol Resettable
   (reset! [this value]))
 
+(defrecord CallbackGauge [callback-fn]
+  IDeref
+  (deref [_this] (callback-fn)))
+
 (defrecord Gauge [^DoubleAdder current-val]
   IDeref
   (deref [_this] (.sum current-val))
@@ -185,19 +189,21 @@
 (alter-meta! #'->Gauge assoc :private true)
 
 
-(defn- gauge-collector-fn [id description labels]
+(defn- gauge-collector-fn [id description labels callback-fn]
   (fn [] (map->Collector
            {:id                       id
             :description              description
             :type                     :gauge
             :label-values->collectors (ConcurrentHashMap.)
             :labels                   (set labels)
-            :metric-fn                #(Gauge. (DoubleAdder.))})))
+            :metric-fn                (if callback-fn #(CallbackGauge. callback-fn) #(Gauge. (DoubleAdder.)))})))
 
 (defn gauge
-  [id & {description :description labels :labels registry :registry
+  [id & {description :description labels :labels registry :registry callback-fn :callback-fn
          :or         {labels [] description "" registry default-registry}}]
-  (let [collector (register-or-return! registry id :gauge (gauge-collector-fn id description labels))]
+  (when (and callback-fn (seq labels))
+    (throw (IllegalArgumentException. "Callback gauges must not have labels.")))
+  (let [collector (register-or-return! registry id :gauge (gauge-collector-fn id description labels callback-fn))]
     (if (empty? labels)
       (get-or-create-metric! collector {})
       collector)))
@@ -401,8 +407,8 @@
                                       {max-age-seconds 600
                                        age-buckets     5
                                        quantiles       []
-                                       description ""
-                                       registry    default-registry}}]
+                                       description     ""
+                                       registry        default-registry}}]
   (when (contains? (set labels) "quantile")
     (throw (IllegalArgumentException. "'quantile' is a reserved label for summaries.")))
   (when (<= max-age-seconds 0)

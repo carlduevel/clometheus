@@ -17,6 +17,13 @@
         expected "# HELP labelless_gauge Gauge without labels\n# TYPE labelless_gauge gauge\nlabelless_gauge 1.0\n"]
     (is (= actual expected))))
 
+(deftest callback-gauges-are-formatted
+  (let [_gauge   (-> (c/gauge "callback_gauge" :description "Gauge with callback" :callback-fn (constantly 1)))
+        actual   (-> (StringWriter.) (f/write (.sample (c/fetch c/default-registry "callback_gauge" :gauge)))
+                     (.toString))
+        expected "# HELP callback_gauge Gauge with callback\n# TYPE callback_gauge gauge\ncallback_gauge 1.0\n"]
+    (is (= actual expected))))
+
 (deftest labels-are-formatted
   (let [counter  (doto (c/counter "my_counter" :description "blabla" :labels ["rc"])
                    (c/inc! :labels {"rc" 200})

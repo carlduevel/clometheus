@@ -103,6 +103,26 @@
       (is (thrown-with-msg? IllegalArgumentException #"Wrong or insufficient labels provided."
                             (c/dec! my-label-gauge))))))
 
+(deftest callback-gauge-test
+  (let [callback-gauge (c/gauge "my_callback_gauge" :callback-fn (constantly 3.0))]
+    (testing "Callback gauges call a passed function on deref"
+      (is (= 3.0 @callback-gauge)))
+    (testing
+      (is (= [(c/map->Sample {:id            "my_callback_gauge"
+                              :description   ""
+                              :type          :gauge
+                              :label->values {{} 3.0}})]
+             (c/collect c/default-registry))))
+    (testing "Callback gauge cannot be incremented."
+      (is (thrown? IllegalArgumentException (c/inc! callback-gauge))))
+    (testing "Callback gauges cannot be decremented"
+      (is (thrown? IllegalArgumentException (c/dec! callback-gauge))))
+    (testing "Callback gauges cannot be set"
+      (is (thrown? IllegalArgumentException (c/set! callback-gauge 5))))
+    (testing "labels are not supported  on callback gauges"
+      (is (thrown? IllegalArgumentException (c/gauge "callback_with_labels" :labels ["not" "possible"] :callback-fn (constantly 1)))))))
+
+
 (deftest labeless-histogram-test
   (let [^Histogram my-histogram (c/histogram "my_histogram" :buckets [1.0 2.0 3.0])]
     (testing "histogram exists"
@@ -237,20 +257,18 @@
     (testing "already registered summaries are returned and not new created"
       (is (= my-summary (c/summary "my_summary_with_quantiles_and_labels" :labels ["status"]))))
     (testing "summaries are collectable"
-      (is (= [(c/map->Sample
-                (c/map->Sample {:description   ""
-                                :id            "my_summary_with_quantiles_and_labels"
-                                :label->values {{"status"  "ok"
-                                                 :quantile "0.75"} 2.0
-                                                {"status"  "ok"
-                                                 :quantile "0.99"} 2.0}
-                                :total-count   1.0
-                                :total-sum     2.0
-                                :type          :summary}))]
+      (is (= [(c/map->Sample {:description   ""
+                              :id            "my_summary_with_quantiles_and_labels"
+                              :label->values {{"status"  "ok"
+                                               :quantile "0.75"} 2.0
+                                              {"status"  "ok"
+                                               :quantile "0.99"} 2.0}
+                              :total-count   1.0
+                              :total-sum     2.0
+                              :type          :summary})]
              (c/collect c/default-registry))))
     (testing "summarys can be registered to other registries than the default one"
       (is (not= my-summary (c/summary "my_summary_with_quantiles_and_labels" :registry (c/registry)))))))
-
 
 
 
