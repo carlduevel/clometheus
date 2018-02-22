@@ -441,3 +441,10 @@
 
 (defmethod print-method Summary [h ^Writer writer]
   ((get-method print-method IRecord) h writer))
+
+(defmacro time [observer  & body]
+  `(let [start# (System/currentTimeMillis)]
+    (try
+      ~@body
+      (finally
+        (observe! ~observer (* (- (System/currentTimeMillis) start#) 0.001))))))

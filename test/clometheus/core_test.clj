@@ -297,3 +297,15 @@
                           #"Metric my_metric is a counter and not a gauge"
                           (c/counter "my_metric")
                           (c/gauge "my_metric")))))
+
+(deftest timed-test
+  (testing "timing is done in seconds"
+    (let [histogram (c/histogram "time_this_code" :buckets [0.001 0.01 0.1])]
+      (is (= "done" (c/time histogram
+                            (Thread/sleep 10)
+                            "done")))
+      (is (= [0.0 1.0 1.0 1.0] (vals @histogram)))
+
+      )
+
+    ))
