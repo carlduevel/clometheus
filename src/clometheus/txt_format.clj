@@ -1,6 +1,7 @@
 (ns clometheus.txt-format
-  (:import (java.io Writer)
-           (clometheus.core Sample)))
+  (:require [clometheus.core :as c])
+  (:import (java.io Writer StringWriter)
+           (clometheus.core Sample ICollectorRegistry)))
 
 
 (defn- writeEscaped [^Writer writer ^String description]
@@ -64,3 +65,11 @@
     (.write writer (format "%s_count %s\n" id (go-str total-count)))
     (.write writer (format "%s_sum %s\n" id (go-str total-sum))))
   writer)
+
+(defn metrics-response [^ICollectorRegistry registry]
+  {:headers {"Content-Type" "text/plain; version=0.0.4; charset=utf-8"}
+   :status 200
+   :body    (let [writer (StringWriter.)]
+              (doseq [sample (c/collect registry)]
+                (write writer sample))
+              (.toString writer))})

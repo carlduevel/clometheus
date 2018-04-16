@@ -76,3 +76,15 @@
                       "my_summary_count 1.0\n"
                       "my_summary_sum 1.0\n")]
     (is (= expected actual))))
+
+(deftest metric-response
+  (is (= {:headers {"Content-Type" "text/plain; version=0.0.4; charset=utf-8"}
+          :status 200
+          :body ""}
+         (f/metrics-response c/default-registry)))
+  (doto (c/counter "my_counter" :description "simple counter" :labels ["foo"])
+    (c/inc! :labels {"foo" "bar"}))
+  (is (= {:headers {"Content-Type" "text/plain; version=0.0.4; charset=utf-8"}
+          :status 200
+          :body "# HELP my_counter simple counter\n# TYPE my_counter counter\nmy_counter {foo=\"bar\",} 1.0\n"}
+         (f/metrics-response c/default-registry))))

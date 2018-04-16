@@ -304,8 +304,4 @@
       (is (= "done" (c/time histogram
                             (Thread/sleep 10)
                             "done")))
-      (is (= [0.0 1.0 1.0 1.0] (vals @histogram)))
-
-      )
-
-    ))
+      (is (= [0.0 1.0 1.0 1.0] (vals @histogram))))))
