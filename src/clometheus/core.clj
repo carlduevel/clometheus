@@ -26,7 +26,7 @@
                                            "'. Metric name has to match this regex: [a-zA-Z_:][a-zA-Z0-9_:]*")))))
 (let [valid-label-re    #"[a-zA-Z_][a-zA-Z0-9_]*"
       reserved-label-re #"__.*"]
-  (defn validate-label-name [label-name]
+  (defn- validate-label-name [label-name]
     (when-not (re-matches valid-label-re label-name)
       (throw (IllegalArgumentException.
                (str "Invalid label name: '" label-name
@@ -437,6 +437,9 @@
   ((get-method print-method IRecord) h writer))
 
 (defmethod print-method Histogram [h ^Writer writer]
+  ((get-method print-method IRecord) h writer))
+
+(defmethod print-method CallbackGauge [h ^Writer writer]
   ((get-method print-method IRecord) h writer))
 
 (defmethod print-method Summary [h ^Writer writer]

@@ -1,6 +1,7 @@
 (ns clometheus.core-test
   (:require [clojure.test :refer :all]
-            [clometheus.core :as c])
+            [clometheus.core :as c]
+            [clojure.string :as str])
   (:import (clometheus.core Collector Histogram Summary)
            (java.io StringWriter)))
 
@@ -211,6 +212,9 @@
                  :total-count   0.0
                  :total-sum     0.0})]
              (c/collect c/default-registry))))
+    (testing "summaries are observable"
+      (c/observe! my-summary 0.5)
+      (is (= 0.5 (.sum my-summary))))
     (testing "summarys can be registered to other registries than the default one"
       (is (not= my-summary (c/summary "my_summary_wo_quantiles" :registry (c/registry)))))))
 
@@ -280,7 +284,9 @@
 (deftest all-abstractions-should-be-printable
   (is (= "#clometheus.core.Gauge{:current-val 0.0}" (str-represenation (c/gauge "gauge"))))
   (is (= "#clometheus.core.Counter{:current-val 0.0}" (str-represenation (c/counter "counter"))))
-  (is (= "#clometheus.core.Histogram{:bucket-sizes (0.1 1 10), :bucket-adders (0.0 0.0 0.0), :total-bucket 0.0, :count-and-sum #clometheus.core.CountAndSum{:counter 0.0, :summer 0.0}}" (str-represenation (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10])))))
+  (is (= "#clometheus.core.Histogram{:bucket-sizes (0.1 1 10), :bucket-adders (0.0 0.0 0.0), :total-bucket 0.0, :count-and-sum #clometheus.core.CountAndSum{:counter 0.0, :summer 0.0}}"
+         (str-represenation (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10]))))
+  (is (str/starts-with?  (str-represenation (c/gauge "my_callback_gauge" :callback-fn #(42))) "#clometheus.core.CallbackGauge{:callback-fn ")))
 
 (deftest restriction-on-metric-names-test
   (testing "Special chars are not allowed in a metric name."
