@@ -81,7 +81,8 @@
   (is (= {:headers {"Content-Type" "text/plain; version=0.0.4; charset=utf-8"}
           :status 200
           :body ""}
-         (f/metrics-response c/default-registry)))
+         (f/metrics-response c/default-registry)
+         (f/metrics-response)))
   (doto (c/counter "my_counter" :description "simple counter" :labels ["foo"])
     (c/inc! :labels {"foo" "bar"}))
   (is (= {:headers {"Content-Type" "text/plain; version=0.0.4; charset=utf-8"}
