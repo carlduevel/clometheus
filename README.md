@@ -2,7 +2,7 @@
 
 __clometheus__ is a zero dependency instrumentation library for [Prometheus](https://prometheus.io/).
 
-TODO: Version link to clojars
+[![Clojars Project](https://img.shields.io/clojars/v/online.duevel/clometheus.svg)](https://clojars.org/online.duevel/clometheus)
 
 TODO: Build link to travis ci
 
