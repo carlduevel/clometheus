@@ -46,7 +46,7 @@
     (is (= actual expected))))
 
 (deftest infinity-is-handled
-  (let [_gauge    (-> (c/gauge "gauge_with_inf" :description "Gauge without labels") (c/set! Double/POSITIVE_INFINITY))
+  (let [_gauge   (-> (c/gauge "gauge_with_inf" :description "Gauge without labels") (c/set! Double/POSITIVE_INFINITY))
         actual   (-> (StringWriter.) (f/write (.sample (c/fetch c/default-registry "gauge_with_inf" :gauge)))
                      (.toString))
         expected "# HELP gauge_with_inf Gauge without labels\n# TYPE gauge_with_inf gauge\ngauge_with_inf +Inf\n"]
@@ -79,13 +79,13 @@
 
 (deftest metric-response
   (is (= {:headers {"Content-Type" "text/plain; version=0.0.4; charset=utf-8"}
-          :status 200
-          :body ""}
+          :status  200
+          :body    ""}
          (f/metrics-response c/default-registry)
          (f/metrics-response)))
-  (doto (c/counter "my_counter" :description "simple counter" :labels ["foo"])
-    (c/inc! :labels {"foo" "bar"}))
+  (-> (c/counter "my_counter" :description "simple counter" :labels ["foo"])
+      (c/inc! :labels {"foo" "bar"}))
   (is (= {:headers {"Content-Type" "text/plain; version=0.0.4; charset=utf-8"}
-          :status 200
-          :body "# HELP my_counter simple counter\n# TYPE my_counter counter\nmy_counter {foo=\"bar\",} 1.0\n"}
+          :status  200
+          :body    "# HELP my_counter simple counter\n# TYPE my_counter counter\nmy_counter {foo=\"bar\",} 1.0\n"}
          (f/metrics-response c/default-registry))))

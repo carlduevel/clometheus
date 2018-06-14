@@ -1,6 +1,6 @@
 # clometheus
 
-__clometheus__ is a zero dependency instrumentation library for Prometheus.
+__clometheus__ is a zero dependency instrumentation library for [Prometheus].
 
 TODO: Version link to clojars
 
@@ -96,10 +96,6 @@ But more likely you want some quantiles:
 ```clojure
 (c/summary "kafka_lag_in_seconds" :labels ["consumer_group_id" "topic"] :quantiles [(c/quantile 0.5  0.05)(c/quantile 0.9  0.01) (c/quantile 0.99 0.001)])
 ```
-
-
-
-
 ## License
 
-TODO: Which licence(s) to distribute under?
+This project is licensed under the Apache License 2.0.
