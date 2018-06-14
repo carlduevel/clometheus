@@ -1,17 +1,15 @@
 # clometheus
 
-__clometheus__ is a zero dependency instrumentation library for [Prometheus].
+__clometheus__ is a zero dependency instrumentation library for [Prometheus](https://prometheus.io/).
 
 TODO: Version link to clojars
 
 TODO: Build link to travis ci
 
-TODO: Comment about matureness and possible changes in the future
-
 ## Why?
 
-There are a lot of clojure wrappers around the java Prometheus client out there.
-But they all force you to register metrics before using them, because that is
+There are a lot of clojure wrappers for the [Java Prometheus client](https://github.com/prometheus/client_java) out there.
+They all force you to register metrics before using them, because that is
 how the java client works. This is a good idea in Java, but not so much in Clojure
 as it leads to code like this:
 
@@ -23,7 +21,7 @@ as it leads to code like this:
 (prometheus/inc! :my-dear-counter) ; This is error prone: Get the label wrong and after all: What type is it of? What labels does it have?
 
 ```
-Instead to instrument something with clometheus, you just do it.
+Instead to instrument with clometheus, you just do it on the spot.
 No registry to take care of (if you do not want to) and no registration necessary:
 
 ```clojure
@@ -31,8 +29,8 @@ No registry to take care of (if you do not want to) and no registration necessar
 (c/inc! (c/counter "my_counter"))
 ```
 Clometheus can do this because it does not just wrap the prometheus library but the instrumentation
-code is implemented in Clojure itself (though the summary implementation is in Java and the same
-as in the java client). TODO: add link here
+code is implemented in Clojure itself (with the summary implementation being the sole exception as it is the same
+as in the Java client).
 
 ## Usage
 
