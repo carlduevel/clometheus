@@ -94,6 +94,15 @@ But more likely you want some quantiles:
 ```clojure
 (c/summary "kafka_lag_in_seconds" :labels ["consumer_group_id" "topic"] :quantiles [(c/quantile 0.5  0.05)(c/quantile 0.9  0.01) (c/quantile 0.99 0.001)])
 ```
+
+### Exposing metrics
+Create a compojure route to export your metrics:
+```clojure
+(require '[clometheus.txt-format :as txt]
+         '[compojure.core :refer (GET)])
+(GET "/metrics" [] (txt/metrics-response))
+```
+
 ## License
 
 This project is licensed under the Apache License 2.0.
