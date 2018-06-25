@@ -74,4 +74,4 @@
                          :body    (let [writer (StringWriter.)]
                                     (doseq [sample (c/collect registry)]
                                       (write writer sample))
-                                    (.toString writer))}))
+                                    (str writer))}))

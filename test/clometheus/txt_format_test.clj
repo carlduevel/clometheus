@@ -28,7 +28,7 @@
   (let [counter  (doto (c/counter "my_counter" :description "blabla" :labels ["rc"])
                    (c/inc! :labels {"rc" 200})
                    (c/inc! :labels {"rc" 500} :by 3))
-        actual   (-> (StringWriter.) (#'f/write (.sample counter)) (.toString))
+        actual   (-> (StringWriter.) (#'f/write (.sample counter)) (str))
         expected (str "# HELP my_counter blabla\n"
                       "# TYPE my_counter counter\n"
                       "my_counter {rc=\"500\",} 3.0\n"
@@ -38,7 +38,7 @@
 (deftest description-and-label-values-are-escaped
   (let [counter  (doto (c/counter "my_counter" :description "\n I am weird \\" :labels ["foo"])
                    (c/inc! :labels {"foo" "\nrc\\\""}))
-        actual   (-> (StringWriter.) (#'f/write (.sample counter)) (.toString))
+        actual   (-> (StringWriter.) (#'f/write (.sample counter)) (str))
 
         expected (str "# HELP my_counter \\n I am weird \\\\\n"
                       "# TYPE my_counter counter\n"
@@ -48,14 +48,14 @@
 (deftest infinity-is-handled
   (let [_gauge   (-> (c/gauge "gauge_with_inf" :description "Gauge without labels") (c/set! Double/POSITIVE_INFINITY))
         actual   (-> (StringWriter.) (#'f/write (.sample (c/fetch c/default-registry "gauge_with_inf" :gauge)))
-                     (.toString))
+                     (str))
         expected "# HELP gauge_with_inf Gauge without labels\n# TYPE gauge_with_inf gauge\ngauge_with_inf +Inf\n"]
     (is (= actual expected))))
 
 (deftest histograms-are-handled
   (let [h        (c/histogram "my_histogram" :labels ["foo"] :buckets [1 2])
         _        (c/observe! h 1 :labels {"foo" "bar"})
-        actual   (-> (StringWriter.) (#'f/write (.sample h)) (.toString))
+        actual   (-> (StringWriter.) (#'f/write (.sample h)) (str))
         expected (str "# HELP my_histogram \n"
                       "# TYPE my_histogram histogram\n"
                       "my_histogram {foo=\"bar\",le=\"1\",} 1.0\n"
@@ -68,7 +68,7 @@
 (deftest summaries-are-handled
   (let [summary  (c/summary "my_summary" :labels ["foo"] :quantiles [(c/quantile 0.99 0.03) (c/quantile 0.95 0.03)])
         _        (c/observe! summary 1 :labels {"foo" "bar"})
-        actual   (-> (StringWriter.) (#'f/write (.sample summary)) (.toString))
+        actual   (-> (StringWriter.) (#'f/write (.sample summary)) (str))
         expected (str "# HELP my_summary \n"
                       "# TYPE my_summary summary\n"
                       "my_summary {foo=\"bar\",quantile=\"0.99\",} 1.0\n"
