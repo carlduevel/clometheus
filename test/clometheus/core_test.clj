@@ -308,6 +308,6 @@
   (testing "timing is done in seconds"
     (let [histogram (c/histogram "time_this_code" :buckets [0.001 0.01 0.1])]
       (is (= "done" (c/timed histogram
-                             (Thread/sleep 10)
+                             (Thread/sleep 5)
                              "done")))
       (is (= [0.0 1.0 1.0 1.0] (vals @histogram))))))
