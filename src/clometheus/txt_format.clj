@@ -57,7 +57,7 @@
         (.write writer (go-str v))
         (.write writer "\n")))))
 
-(defn write [^Writer writer ^Sample {:keys [id description type label->values total-sum total-count]}]
+(defn- write [^Writer writer ^Sample {:keys [id description type label->values total-sum total-count]}]
   (write-description! writer id description)
   (write-type! writer id (name type))
   (write-values! writer id label->values)
