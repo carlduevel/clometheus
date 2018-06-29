@@ -102,6 +102,33 @@ Create a compojure route to export your metrics:
          '[compojure.core :refer (GET)])
 (GET "/metrics" [] (txt/metrics-response))
 ```
+It is possible to use the prometheus java client alongside clometheus.
+Exporting metrics can then be done like this:
+
+```clojure
+(require '[clometheus.txt-format :as txt]
+         '[clometheus.core :as c])
+(import io.prometheus.client.exporter.common.TextFormat
+        io.prometheus.client.CollectorRegistry
+        clometheus.core.ICollectorRegistry)
+
+
+(defn- text-format
+  ([] (text-format  CollectorRegistry/defaultRegistry c/default-registry))
+  ([^CollectorRegistry java-client-registry ^ICollectorRegistry clometheus-registry]
+   (with-open [out (java.io.StringWriter.)]
+     (TextFormat/write004 out (.metricFamilySamples java-client-registry))
+     (doseq [sample (c/collect clometheus-registry)]
+       (txt/write out sample))
+     (str out))))
+
+(defn metrics-response
+  ([] (metrics-response CollectorRegistry/defaultRegistry c/default-registry))
+  ([^CollectorRegistry java-client-registry  ^ICollectorRegistry clometheus-registry]
+   {:headers {"Content-Type" "text/plain; version=0.0.4; charset=utf-8"}
+    :status  200
+    :body    (text-format java-client-registry clometheus-registry)}))
+```
 
 ## License
 
