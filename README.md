@@ -6,6 +6,8 @@ __clometheus__ is a zero dependency instrumentation library for [Prometheus](htt
 
 [![Build Status](https://travis-ci.com/hackbert/clometheus.svg?branch=master)](https://travis-ci.com/hackbert/clometheus)
 
+[![Dependencies Status](https://jarkeeper.com/hackbert/clometheus/status.svg)](https://jarkeeper.com/hackbert/clometheus)
+
 ## Why?
 
 There are a lot of clojure wrappers for the [Java Prometheus client](https://github.com/prometheus/client_java) out there.
