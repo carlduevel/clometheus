@@ -129,7 +129,7 @@
     (testing "histogram exists"
       (is (not= nil my-histogram)))
     (testing "histograms start with all buckets set to zero"
-      (is (= {{:le "1.0"} 0.0 {:le "2.0"} 0.0 {:le "3.0"} 0.0 {:le "+Inf"} 0.0})) @my-histogram)
+      (is (= {{:le "1.0"} 0.0 {:le "2.0"} 0.0 {:le "3.0"} 0.0 {:le "+Inf"} 0.0} @my-histogram)))
     (testing "histograms can observe values"
       (c/observe! my-histogram 2)
       (is (= {{:le "1.0"} 0.0 {:le "2.0"} 1.0 {:le "3.0"} 1.0 {:le "+Inf"} 1.0} @my-histogram)))
