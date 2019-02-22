@@ -131,6 +131,20 @@ Exporting metrics can then be done like this:
     :status  200
     :body    (text-format java-client-registry clometheus-registry)}))
 ```
+### Misc
+In order to [avoid missing
+metrics](https://www.robustperception.io/existential-issues-with-metrics)
+you should define metrics before using them.
+So for an error counter do not:
+```clojure
+(c/inc! (c/counter "my_error_counter"))
+```
+But define the error counter beforehand so it does not show up out of nowhere:
+```clojure
+(def my-error-counter (c/counter "my_error_counter"))
+[...]
+(c/inc! my-error-counter)
+```
 
 ## License
 
