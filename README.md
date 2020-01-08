@@ -4,9 +4,9 @@ __clometheus__ is a zero dependency instrumentation library for [Prometheus](htt
 
 [![Clojars Project](https://img.shields.io/clojars/v/online.duevel/clometheus.svg)](https://clojars.org/online.duevel/clometheus)
 
-[![Build Status](https://travis-ci.com/hackbert/clometheus.svg?branch=master)](https://travis-ci.com/hackbert/clometheus)
+[![Build Status](https://travis-ci.com/carlduevel/clometheus.svg?branch=master)](https://travis-ci.com/carlduevel/clometheus)
 
-[![Dependencies Status](https://jarkeeper.com/hackbert/clometheus/status.svg)](https://jarkeeper.com/hackbert/clometheus)
+[![Dependencies Status](https://jarkeeper.com/carlduevel/clometheus/status.svg)](https://jarkeeper.com/carlduevel/clometheus)
 
 ## Why?
 

@@ -1,6 +1,6 @@
 (defproject online.duevel/clometheus "0.1.1-SNAPSHOT"
   :description "Prometheus client library"
-  :url "https://github.com/hackbert/clometheus"
+  :url "https://github.com/carlduevel/clometheus"
   :license {:name "Apache License 2.0"
             :url  "https://www.apache.org/licenses/LICENSE-2.0"}
   :lein-release {:deploy-via :clojars}
