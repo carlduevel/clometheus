@@ -166,8 +166,8 @@
 (defprotocol Decrementable
   (decrement! [this] [this value]))
 
-(defprotocol Resettable
-  (reset! [this value]))
+(defprotocol Settable
+  (set-to! [this value]))
 
 (defrecord CallbackGauge [callback-fn]
   IDeref
@@ -182,8 +182,8 @@
   Decrementable
   (decrement! [this] (decrement! this 1))
   (decrement! [_this val] (.add current-val (* -1 val)))
-  Resettable
-  (reset! [_this new-val] (locking current-val (.reset current-val) (.add current-val new-val))))
+  Settable
+  (set-to! [_this new-val] (locking current-val (.reset current-val) (.add current-val new-val))))
 
 (alter-meta! #'map->Gauge assoc :private true)
 (alter-meta! #'->Gauge assoc :private true)
@@ -253,7 +253,7 @@
   Gauge
   ([this val & {:keys [labels] :or {labels {}}}]
     (if (empty? labels)
-      (reset! this val)
+      (set-to! this val)
       (throw (Exception. "No labels are possible for simple gauge!")))))
 
 (defn- validate-labels [^Collector collector labels->values]
@@ -283,7 +283,7 @@
   Collector
   ([this val & {:keys [labels] :or {labels {}}}]
     (validate-labels this labels)
-    (reset! (get-or-create-metric! this labels) val)))
+    (set-to! (get-or-create-metric! this labels) val)))
 
 
 
