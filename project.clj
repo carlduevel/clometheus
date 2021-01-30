@@ -5,5 +5,5 @@
             :url  "https://www.apache.org/licenses/LICENSE-2.0"}
   :lein-release {:deploy-via :clojars}
   :java-source-paths ["java"]
-  :dependencies [[org.clojure/clojure "1.10.1"]]
+  :dependencies [[org.clojure/clojure "1.10.2"]]
   :profiles {:dev {:plugins [[lein-release/lein-release "1.0.9"]]}})
