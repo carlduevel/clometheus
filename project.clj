@@ -1,4 +1,4 @@
-(defproject online.duevel/clometheus "0.2.0"
+(defproject online.duevel/clometheus "0.2.1-SNAPSHOT"
   :description "Prometheus client library"
   :url "https://github.com/carlduevel/clometheus"
   :license {:name "Apache License 2.0"
