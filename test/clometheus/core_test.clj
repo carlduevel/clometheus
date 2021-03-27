@@ -1,5 +1,5 @@
 (ns clometheus.core-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [testing is deftest use-fixtures]]
             [clometheus.core :as c]
             [clojure.string :as str])
   (:import (clometheus.core Collector Histogram Summary)
