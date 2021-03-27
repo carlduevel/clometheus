@@ -6,7 +6,7 @@ __clometheus__ is a zero dependency instrumentation library for [Prometheus](htt
 
 [![Build Status](https://travis-ci.com/carlduevel/clometheus.svg?branch=master)](https://travis-ci.com/carlduevel/clometheus)
 
-[![Dependencies Status](https://jarkeeper.com/carlduevel/clometheus/status.svg)](https://jarkeeper.com/carlduevel/clometheus)
+[![Dependencies Status](https://versions.deps.co/carlduevel/clometheus/status.svg)](https://versions.deps.co/carlduevel/clometheus)
 
 ## Why?
 
