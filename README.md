@@ -98,6 +98,7 @@ But more likely you want some quantiles:
 ```
 
 ### Exposing metrics
+#### Via web server
 Create a compojure route to export your metrics:
 ```clojure
 (require '[clometheus.txt-format :as txt]
@@ -131,9 +132,11 @@ Exporting metrics can then be done like this:
     :status  200
     :body    (text-format java-client-registry clometheus-registry)}))
 ```
+#### Pushgateway
+Use [this](https://github.com/carlduevel/clometheus-pushgateway). 
+
 ### Misc
-In order to [avoid missing
-metrics](https://www.robustperception.io/existential-issues-with-metrics)
+In order to [avoid missing metrics](https://www.robustperception.io/existential-issues-with-metrics)
 you should define metrics before using them.
 So for an error counter do not:
 ```clojure
