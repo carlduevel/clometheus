@@ -104,7 +104,7 @@
       (is (thrown-with-msg? IllegalArgumentException #"Wrong or insufficient labels provided."
                             (c/dec! my-label-gauge))))))
 
-(deftest callback-gauge-test
+(deftest callback-labeless-gauge-test
   (let [callback-gauge (c/gauge "my_callback_gauge" :callback-fn (constantly 3.0))]
     (testing "Callback gauges call a passed function on deref"
       (is (= 3.0 @callback-gauge)))
@@ -119,9 +119,25 @@
     (testing "Callback gauges cannot be decremented"
       (is (thrown? IllegalArgumentException (c/dec! callback-gauge))))
     (testing "Callback gauges cannot be set"
-      (is (thrown? IllegalArgumentException (c/set! callback-gauge 5))))
-    (testing "labels are not supported  on callback gauges"
-      (is (thrown? IllegalArgumentException (c/gauge "callback_with_labels" :labels ["not" "possible"] :callback-fn (constantly 1)))))))
+      (is (thrown? IllegalArgumentException (c/set! callback-gauge 5))))))
+
+(deftest callback-lables-gauge
+  (let [outcome        {{"foo" "baz" "bar" "barf"} 1}
+        callback-gauge (c/gauge "callback_with_labels" :description "callback gauge with labels" :labels ["foo", "bar"] :callback-fn (fn[]outcome))]
+    (testing "callback function is called for deref"
+      (is (= outcome @callback-gauge)))
+    (testing "collecting the registry"
+      (is (= [(c/map->Sample {:id            "callback_with_labels"
+                              :description   "callback gauge with labels"
+                              :type          :gauge
+                              :label->values outcome})]
+             (c/collect c/default-registry))))
+    (testing "Callback gauge cannot be incremented."
+      (is (thrown? IllegalArgumentException (c/inc! callback-gauge))))
+    (testing "Callback gauges cannot be decremented"
+      (is (thrown? IllegalArgumentException (c/dec! callback-gauge))))
+    (testing "Callback gauges cannot be set"
+      (is (thrown? IllegalArgumentException (c/set! callback-gauge 5))))))
 
 
 (deftest labeless-histogram-test
@@ -286,7 +302,9 @@
   (is (= "#clometheus.core.Counter{:current-val 0.0}" (str-represenation (c/counter "counter"))))
   (is (= "#clometheus.core.Histogram{:bucket-sizes (0.1 1 10), :bucket-adders (0.0 0.0 0.0), :total-bucket 0.0, :count-and-sum #clometheus.core.CountAndSum{:counter 0.0, :summer 0.0}}"
          (str-represenation (c/histogram "my_histogram" :description "labeless histogram" :buckets [0.1 1 10]))))
-  (is (str/starts-with?  (str-represenation (c/gauge "my_callback_gauge" :callback-fn #(42))) "#clometheus.core.CallbackGauge{:callback-fn ")))
+  (is (str/starts-with?
+        (str-represenation (c/gauge "my_callback_gauge" :callback-fn #(42)))
+        "#clometheus.core.CallbackGauge{:id \"my_callback_gauge\", :description \"\", :labels #{}, :callback-fn")))
 
 (deftest restriction-on-metric-names-test
   (testing "Special chars are not allowed in a metric name."

@@ -169,9 +169,7 @@
 (defprotocol Settable
   (set-to! [this value]))
 
-(defrecord CallbackGauge [callback-fn]
-  IDeref
-  (deref [_this] (callback-fn)))
+
 
 (defrecord Gauge [^DoubleAdder current-val]
   IDeref
@@ -189,24 +187,37 @@
 (alter-meta! #'->Gauge assoc :private true)
 
 
-(defn- gauge-collector-fn [id description labels callback-fn]
+(defn- gauge-collector-fn [id description labels]
   (fn [] (map->Collector
            {:id                       id
             :description              description
             :type                     :gauge
             :label-values->collectors (ConcurrentHashMap.)
             :labels                   (set labels)
-            :metric-fn                (if callback-fn #(CallbackGauge. callback-fn) #(Gauge. (DoubleAdder.)))})))
+            :metric-fn                #(Gauge. (DoubleAdder.))})))
+
+
+(defrecord CallbackGauge [id description labels callback-fn]
+  IDeref
+  (deref [_this] (callback-fn))
+  ICollector
+  (id [_this] id)
+  (description [_this] description)
+  (metric-type [_this] :gauge)
+  (sample [_this]
+    (->Sample id description :gauge (if (seq labels)(callback-fn) {{} (callback-fn)}) nil nil))
+  (get-or-create-metric! [_this _labels->vals]
+    (throw (UnsupportedOperationException. "Not possible on CallbackGauge"))))
 
 (defn gauge
   [id & {description :description labels :labels registry :registry callback-fn :callback-fn
          :or         {labels [] description "" registry default-registry}}]
-  (when (and callback-fn (seq labels))
-    (throw (IllegalArgumentException. "Callback gauges must not have labels.")))
-  (let [collector (register-or-return! registry id :gauge (gauge-collector-fn id description labels callback-fn))]
-    (if (empty? labels)
-      (get-or-create-metric! collector {})
-      collector)))
+  (if callback-fn
+    (register-or-return! registry id :gauge (fn[] (->CallbackGauge id description (set labels) callback-fn)))
+    (let [collector (register-or-return! registry id :gauge (gauge-collector-fn id description labels))]
+      (if (empty? labels)
+        (get-or-create-metric! collector {})
+        collector))))
 
 (defprotocol Observable
   (observation! [this value]))
