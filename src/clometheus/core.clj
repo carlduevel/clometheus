@@ -103,8 +103,7 @@
   (sample [this]
     (let [labels->values (reduce-kv (fn [m labels collector]
                                       (cond
-                                        (number? @collector)
-                                        (assoc m labels @collector)
+                                        (number? @collector) (assoc m labels @collector)
                                         (associative? @collector)
                                         (let [buckets->values @collector]
                                           (merge m (zipmap (for [bucket (keys buckets->values)] (merge bucket labels)) (vals buckets->values)))))) {}
@@ -242,30 +241,30 @@
 (defmethod inc!
   Counter
   ([this & {:keys [labels by] :or {labels {} by 1}}]
-    (if (empty? labels)
-      (increment! this by)
-      (throw (Exception. "No labels are possible for simple counter!")))))
+   (if (empty? labels)
+     (increment! this by)
+     (throw (Exception. "No labels are possible for simple counter!")))))
 
 (defmethod inc!
   Gauge
   ([this & {:keys [labels by] :or {labels {} by 1}}]
-    (if (empty? labels)
-      (increment! this by)
-      (throw (Exception. "No labels are possible for simple gauge!")))))
+   (if (empty? labels)
+     (increment! this by)
+     (throw (Exception. "No labels are possible for simple gauge!")))))
 
 (defmethod dec!
   Gauge
   ([this & {:keys [labels by] :or {labels {} by 1}}]
-    (if (empty? labels)
-      (decrement! this by)
-      (throw (Exception. "No labels are possible for simple gauge!")))))
+   (if (empty? labels)
+     (decrement! this by)
+     (throw (Exception. "No labels are possible for simple gauge!")))))
 
 (defmethod set!
   Gauge
   ([this val & {:keys [labels] :or {labels {}}}]
-    (if (empty? labels)
-      (set-to! this val)
-      (throw (Exception. "No labels are possible for simple gauge!")))))
+   (if (empty? labels)
+     (set-to! this val)
+     (throw (Exception. "No labels are possible for simple gauge!")))))
 
 (defn- validate-labels [^Collector collector labels->values]
   (when-not (= (.labels collector) (set (keys labels->values)))
@@ -275,26 +274,26 @@
 (defmethod inc!
   Collector
   ([this & {:keys [labels by] :or {labels {} by 1}}]
-    (validate-labels this labels)
-    (increment! (get-or-create-metric! this labels) (or by 1))))
+   (validate-labels this labels)
+   (increment! (get-or-create-metric! this labels) (or by 1))))
 
 (defmethod dec!
   Collector
   ([this & {:keys [labels by] :or {labels {} by 1}}]
-    (validate-labels this labels)
-    (decrement! (get-or-create-metric! this labels) (or by 1))))
+   (validate-labels this labels)
+   (decrement! (get-or-create-metric! this labels) (or by 1))))
 
 (defmethod observe!
   Collector
   ([this val & {:keys [labels] :or {labels {}}}]
-    (validate-labels this labels)
-    (observation! (get-or-create-metric! this labels) val)))
+   (validate-labels this labels)
+   (observation! (get-or-create-metric! this labels) val)))
 
 (defmethod set!
   Collector
   ([this val & {:keys [labels] :or {labels {}}}]
-    (validate-labels this labels)
-    (set-to! (get-or-create-metric! this labels) val)))
+   (validate-labels this labels)
+   (set-to! (get-or-create-metric! this labels) val)))
 
 
 
@@ -324,9 +323,9 @@
 (defmethod observe!
   Histogram
   ([this value & {:keys [labels] :or {labels {}}}]
-    (if (empty? labels)
-      (observation! this value)
-      (throw (Exception. "No labels are possible for simple histogram!")))))
+   (if (empty? labels)
+     (observation! this value)
+     (throw (Exception. "No labels are possible for simple histogram!")))))
 
 (defn- create-histogram! [buckets ^CountAndSum count-and-sum]
   (map->Histogram {:bucket-sizes  (sort buckets)
@@ -350,10 +349,10 @@
                   labels      :labels
                   registry    :registry
                   :or
-                              {buckets     [0.005 0.01 0.025 0.05 0.075 0.1 0.25 0.5 0.75 1 2.5 5 7.5 10]
-                               labels      []
-                               description ""
-                               registry    default-registry}}]
+                  {buckets     [0.005 0.01 0.025 0.05 0.075 0.1 0.25 0.5 0.75 1 2.5 5 7.5 10]
+                   labels      []
+                   description ""
+                   registry    default-registry}}]
   (when (contains? (set labels) "le")
     (throw (IllegalArgumentException. "'le' is a reserved label for histograms.")))
   (let [collector (register-or-return! registry id :histogram
@@ -415,11 +414,11 @@
                 ^int age-buckets      :age-buckets
                 quantiles             :quantiles
                 :or
-                                      {max-age-seconds 600
-                                       age-buckets     5
-                                       quantiles       []
-                                       description     ""
-                                       registry        default-registry}}]
+                {max-age-seconds 600
+                 age-buckets     5
+                 quantiles       []
+                 description     ""
+                 registry        default-registry}}]
   (when (contains? (set labels) "quantile")
     (throw (IllegalArgumentException. "'quantile' is a reserved label for summaries.")))
   (when (<= max-age-seconds 0)
@@ -437,9 +436,9 @@
 (defmethod observe!
   Summary
   ([this value & {:keys [labels] :or {labels {}}}]
-    (if (empty? labels)
-      (observation! this value)
-      (throw (Exception. "No labels are possible for simple Summary!")))))
+   (if (empty? labels)
+     (observation! this value)
+     (throw (Exception. "No labels are possible for simple Summary!")))))
 
 (defmethod print-method Gauge [h ^Writer writer]
   ((get-method print-method IRecord) h writer))
@@ -458,7 +457,7 @@
 
 (defmacro timed [observer  & body]
   `(let [start# (System/currentTimeMillis)]
-    (try
-      ~@body
-      (finally
-        (observe! ~observer (* (- (System/currentTimeMillis) start#) 0.001))))))
+     (try
+       ~@body
+       (finally
+         (observe! ~observer (* (- (System/currentTimeMillis) start#) 0.001))))))
