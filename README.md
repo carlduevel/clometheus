@@ -105,6 +105,8 @@ Create a compojure route to export your metrics:
          '[compojure.core :refer (GET)])
 (GET "/metrics" [] (txt/metrics-response))
 ```
+
+#### Using prometheus java client
 It is possible to use the prometheus java client alongside clometheus.
 Exporting metrics can then be done like this:
 
@@ -131,6 +133,23 @@ Exporting metrics can then be done like this:
    {:headers {"Content-Type" "text/plain; version=0.0.4; charset=utf-8"}
     :status  200
     :body    (text-format java-client-registry clometheus-registry)}))
+```
+
+There is one caveat though: There should not be the same metrics in both
+registries. So this expression should be true:
+
+```clojure
+(require '[clojure.set :as set]
+         '[clometheus.core :as c])
+(import io.prometheus.client.CollectorRegistry)
+
+(empty? (set/intersection(->> (CollectorRegistry/defaultRegistry)
+                                .metricFamilySamples
+                                enumeration-seq
+                                (mapcat #(.samples %))
+                                (map #(.-name %))
+                                set)
+                           (set (keys c/default-registry))))
 ```
 #### Pushgateway
 Use [this](https://github.com/carlduevel/clometheus-pushgateway). 
