@@ -41,6 +41,9 @@
     (testing "Incrementing by just one works"
       (c/inc! my-counter :labels {"rc" 500})
       (is (== 3 @(c/get-or-create-metric! my-counter {"rc" 500}))))
+    (testing "Incrementing by zero works"
+      (c/inc! my-counter :labels {"rc" 400} :by 0)
+      (is (== 0 @(c/get-or-create-metric! my-counter {"rc" 400}))))
     (testing "Counters may only go up"
       (is (thrown? IllegalArgumentException
                    (c/inc! my-counter :labels {"rc" 500} :by -1))))
@@ -59,7 +62,7 @@
       (is (= [(c/map->Sample {:id            "my_counter"
                               :description   "blabla"
                               :type          :counter
-                              :label->values {{"rc" 200} 1.0 {"rc" 500} 3.0}})]
+                              :label->values {{"rc" 200} 1.0 {"rc" 500} 3.0 {"rc" 400} 0.0}})]
              (c/collect c/default-registry))))))
 
 (deftest labelless-gauge-test

@@ -140,9 +140,10 @@
   (increment! [this]
     (increment! this 1))
   (increment! [_this increment]
-    (if (pos? increment)
+    (if (neg? increment)
+      (throw (IllegalArgumentException. "Counters cannot be incremented with negative values"))
       (.add current-val increment)
-      (throw (IllegalArgumentException. "Counters cannot be incremented with negative values")))))
+      )))
 
 (alter-meta! #'map->Counter assoc :private true)
 (alter-meta! #'->Counter assoc :private true)
