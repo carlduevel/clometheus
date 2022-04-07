@@ -7,5 +7,5 @@
   :lein-release {:deploy-via :clojars}
   :java-source-paths ["java"]
   :javac-options     ["-target" "1.6" "-source" "1.6"]
-  :dependencies [[org.clojure/clojure "1.10.3"]]
+  :dependencies [[org.clojure/clojure "1.11.1"]]
   :profiles {:dev {:plugins [[lein-release/lein-release "1.0.9"]]}})
